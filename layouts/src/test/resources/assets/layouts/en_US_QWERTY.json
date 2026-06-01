@@ -1,0 +1,56 @@
+{
+  "id": "en_US_QWERTY",
+  "locale": "en-US",
+  "direction": "LTR",
+  "rows": [
+    {
+      "keys": [
+        { "code": 113, "label": "q", "width": 0.1 },
+        { "code": 119, "label": "w", "width": 0.1 },
+        { "code": 101, "label": "e", "moreKeys": ["é", "è", "ê", "ë", "ě", "ē"], "width": 0.1 },
+        { "code": 114, "label": "r", "width": 0.1 },
+        { "code": 116, "label": "t", "width": 0.1 },
+        { "code": 121, "label": "y", "width": 0.1 },
+        { "code": 117, "label": "u", "moreKeys": ["ú", "ù", "û", "ü", "ū"], "width": 0.1 },
+        { "code": 105, "label": "i", "moreKeys": ["í", "ì", "î", "ï", "ī"], "width": 0.1 },
+        { "code": 111, "label": "o", "moreKeys": ["ó", "ò", "ô", "ö", "ø", "ō"], "width": 0.1 },
+        { "code": 112, "label": "p", "width": 0.1 }
+      ]
+    },
+    {
+      "keys": [
+        { "code": 97,  "label": "a", "moreKeys": ["á", "à", "â", "ä", "æ", "ā"], "width": 0.1 },
+        { "code": 115, "label": "s", "moreKeys": ["ś", "š", "ß"], "width": 0.1 },
+        { "code": 100, "label": "d", "width": 0.1 },
+        { "code": 102, "label": "f", "width": 0.1 },
+        { "code": 103, "label": "g", "width": 0.1 },
+        { "code": 104, "label": "h", "width": 0.1 },
+        { "code": 106, "label": "j", "width": 0.1 },
+        { "code": 107, "label": "k", "width": 0.1 },
+        { "code": 108, "label": "l", "width": 0.1 }
+      ]
+    },
+    {
+      "keys": [
+        { "code": "SHIFT",  "label": "⇧", "width": 0.15, "isSpecial": true },
+        { "code": 122, "label": "z", "width": 0.1 },
+        { "code": 120, "label": "x", "width": 0.1 },
+        { "code": 99,  "label": "c", "moreKeys": ["ç", "ć", "č"], "width": 0.1 },
+        { "code": 118, "label": "v", "width": 0.1 },
+        { "code": 98,  "label": "b", "width": 0.1 },
+        { "code": 110, "label": "n", "moreKeys": ["ñ", "ń", "ň"], "width": 0.1 },
+        { "code": 109, "label": "m", "width": 0.1 },
+        { "code": "DELETE", "label": "⌫", "width": 0.15, "isSpecial": true }
+      ]
+    },
+    {
+      "keys": [
+        { "code": "SYMBOLS", "label": "?123", "width": 0.15, "isSpecial": true },
+        { "code": "GLOBE",   "label": "🌐",   "width": 0.1,  "isSpecial": true },
+        { "code": "SPACE",   "label": " ",    "width": 0.5,  "isSpecial": true },
+        { "code": 46, "label": ".", "moreKeys": [",", "!", "?", ";", ":", "…"], "width": 0.1 },
+        { "code": "ENTER",   "label": "↵",   "width": 0.15, "isSpecial": true }
+      ]
+    }
+  ]
+}
