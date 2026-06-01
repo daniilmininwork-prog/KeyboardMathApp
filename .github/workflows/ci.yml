@@ -1,0 +1,218 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── 1. Security guards ──────────────────────────────────────────────────────
+  security-guards:
+    name: Security guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run manifest permission guard
+        run: ./gradlew manifestPermissionGuard
+
+      - name: Run core-math Android-free guard
+        run: ./gradlew coreMathAndroidFreeGuard
+
+      - name: Run no-text-logging guard
+        run: ./gradlew noTextLoggingGuard
+
+  # ── 2. Lint ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Lint (Android Lint)
+        run: ./gradlew lint
+
+  # ── 3. core-math unit tests ─────────────────────────────────────────────────
+  core-math-tests:
+    name: core-math tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run core-math tests (golden, false-positive, property, fuzz, stress, performance, locale)
+        run: ./gradlew :core-math:test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-math-test-results
+          path: core-math/build/reports/tests/
+
+  # ── 4. feature-glue tests ───────────────────────────────────────────────────
+  feature-glue-tests:
+    name: feature-glue tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run feature-glue tests
+        run: ./gradlew :feature-glue:test
+
+  # ── 5. app + ime unit tests ─────────────────────────────────────────────────
+  app-tests:
+    name: app & ime unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run app tests
+        run: ./gradlew :app:test :ime:test :design-system:test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-test-results
+          path: |
+            app/build/reports/tests/
+            ime/build/reports/tests/
+            design-system/build/reports/tests/
+
+  # ── 6. Debug build ──────────────────────────────────────────────────────────
+  build-debug:
+    name: Assemble debug
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble debug
+        run: ./gradlew assembleDebug
+
+  # ── 7. Release build (unsigned) ─────────────────────────────────────────────
+  # Catches R8/ProGuard issues early; no signing needed here.
+  build-release:
+    name: Assemble release (unsigned)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble release (unsigned)
+        run: ./gradlew assembleRelease
+
+      - name: Generate SBOM
+        run: ./gradlew :app:cyclonedxBom
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: app/build/reports/bom.json
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-unsigned
+          path: app/build/outputs/apk/release/
+
+  # ── 8. Reproducibility check (release branches only) ───────────────────────
+  reproducibility:
+    name: Reproducibility check
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: First build
+        run: |
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release-unsigned.apk /tmp/build1.apk
+
+      - name: Clean outputs
+        run: ./gradlew clean
+
+      - name: Second build
+        run: |
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release-unsigned.apk /tmp/build2.apk
+
+      - name: Diff builds (must be identical)
+        run: |
+          if cmp -s /tmp/build1.apk /tmp/build2.apk; then
+            echo "Reproducibility check PASSED: both builds are byte-identical."
+          else
+            echo "Reproducibility check FAILED: builds differ."
+            # Show which ZIP entries differ for diagnosis
+            python3 - <<'EOF'
+          import zipfile, hashlib, sys
+          def hashes(path):
+              with zipfile.ZipFile(path) as z:
+                  return {n: hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist()}
+          a, b = hashes("/tmp/build1.apk"), hashes("/tmp/build2.apk")
+          for k in sorted(set(a) | set(b)):
+              if a.get(k) != b.get(k):
+                  print(f"  DIFFERS: {k}")
+          EOF
+            exit 1
+          fi

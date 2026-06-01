@@ -1,0 +1,14 @@
+# Default owner for everything not matched below.
+* @BigBoss
+
+# Engine is the product's heart; extra scrutiny on changes.
+/core-math/ @BigBoss
+
+# Security-sensitive: manifest and security guards.
+/app/src/main/AndroidManifest.xml @BigBoss
+/ime/src/main/AndroidManifest.xml @BigBoss
+/overlay/src/main/AndroidManifest.xml @BigBoss
+/build.gradle.kts @BigBoss
+
+# CI and release configuration.
+/.github/ @BigBoss
