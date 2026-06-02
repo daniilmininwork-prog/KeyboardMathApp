@@ -13,6 +13,16 @@
       Use start/end (not left/right) everywhere in layouts; RTL mirroring has been
       available since API 17 so every supported device handles it natively.
     -->
+
+    <!--
+      RECORD_AUDIO — required for the opt-in voice input feature (T5.2).
+      This is a dangerous runtime permission; the user is prompted at runtime only when
+      the voice key is used and the feature is enabled in Settings. The keyboard operates
+      fully without it (voice input degrades gracefully when permission is absent).
+      No audio is ever recorded without an explicit user gesture (voice key press).
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:label="@string/app_name"
         android:theme="@style/Theme.Tally"

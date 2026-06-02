@@ -1,5 +1,6 @@
 package dev.tally.ime
 
+import android.Manifest
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.util.Log
@@ -7,11 +8,19 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.widget.LinearLayout
+import dev.tally.design.DynamicColorScheme
+import dev.tally.design.TallyThemeManager
+import dev.tally.design.ThemePreset
 import dev.tally.glue.MathEvaluator
 import dev.tally.glue.TallyPreferences
 import dev.tally.keyboard.engine.EditingContext
 import dev.tally.keyboard.engine.FieldPolicy
+import dev.tally.keyboard.engine.FormFactorMode
+import dev.tally.keyboard.engine.FormFactorTransform
 import dev.tally.keyboard.engine.KeyboardHeightPolicy
+import dev.tally.keyboard.engine.SubtypeList
+import dev.tally.keyboard.engine.SubtypeModel
+import dev.tally.keyboard.engine.SubtypeRegistry
 import dev.tally.keyboard.engine.Suggestion
 import dev.tally.math.Suggestion as MathSuggestion
 import dev.tally.prediction.DictionaryLoader
@@ -68,6 +77,16 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
     private lateinit var feedback: KeyFeedback
 
     /**
+     * Manages the active dynamic color scheme and fans it out to every registered [KeyTheme].
+     *
+     * Attached in [onCreate] and detached in [onDestroy] to bound the wallpaper-colors listener
+     * lifetime to the service lifetime. The active preset is restored from [TallyPreferences]
+     * whenever the service is created, and when the user changes the preset in settings the
+     * service reads the new value on the next [onStartInputView].
+     */
+    private val themeManager = TallyThemeManager()
+
+    /**
      * Single [KeyboardController] instance.
      *
      * A lazy initializer means tests that call [handleKey] directly (before [onCreateInputView])
@@ -84,6 +103,41 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
     private var keyPlane: KeyPlaneView? = null
     private var suggestionStrip: SuggestionStripView? = null
     private var rootView: android.widget.LinearLayout? = null
+
+    // ── Voice input (T5.2) ───────────────────────────────────────────────────
+
+    /**
+     * On-device voice recognition engine.
+     *
+     * Created lazily so the SpeechRecognizer is not allocated until the user first enables
+     * and presses the voice key — avoiding unnecessary resource use in installations where
+     * the feature is never turned on.
+     *
+     * The engine is destroyed in [onDestroy] to release the audio focus and internal
+     * recognizer service connection regardless of how the service is shut down.
+     */
+    private val voiceEngine: OsVoiceInputEngine by lazy {
+        OsVoiceInputEngine(applicationContext)
+    }
+
+    // ── Multilingual subtype switcher (T5.1) ─────────────────────────────────
+
+    /**
+     * The ordered list of available subtypes built from [SubtypeRegistry.ALL].
+     *
+     * Built once in [onCreate] so [SubtypeList] validation runs at start-up (not at
+     * the first key press). Subtypes cycle via the globe key.
+     */
+    private val subtypeList: SubtypeList = SubtypeList(SubtypeRegistry.ALL)
+
+    /**
+     * The currently active subtype.
+     *
+     * Restored from [TallyPreferences.activeSubtypeId] in [onCreate]; kept in memory so
+     * globe-key presses are zero-IPC on the input thread. The persisted value is updated
+     * in [cycleSubtype] whenever the user switches.
+     */
+    private var activeSubtype: SubtypeModel = subtypeList.subtypes[0]
 
     // ── Math suggestion (T2.4) ───────────────────────────────────────────────
 
@@ -135,6 +189,11 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         super.onCreate()
         prefs = TallyPreferences(this)
         feedback = KeyFeedback(this)
+        // Apply the persisted theme preset and start listening for wallpaper palette changes.
+        themeManager.preset = ThemePreset.fromKey(prefs.themePresetKey)
+        themeManager.attach(this)
+        // Restore the active subtype; fall back to the first entry if the stored id is gone.
+        activeSubtype = subtypeList.findById(prefs.activeSubtypeId) ?: subtypeList.subtypes[0]
 
         // Load the dictionary on the bg executor so the main thread is never blocked.
         bgExecutor.execute {
@@ -166,6 +225,14 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        // Stop any in-progress recognition and release the audio focus before shutting down.
+        if (prefs.voiceInputEnabled) voiceEngine.destroy()
+        themeManager.detach(this)
+        bgExecutor.shutdownNow()
+        super.onDestroy()
     }
 
     /**
@@ -212,6 +279,12 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
             prefs.numberRowEnabled = enabled
             syncKeyPlaneRows()
         }
+        controller.globeListener = {
+            cycleSubtype()
+        }
+        controller.voiceListener = {
+            startVoiceInput()
+        }
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -234,6 +307,8 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         decoderStack?.wordPredictor?.let { coordinator.setWordSource(it) }
 
         suggestionStrip = SuggestionStripView(this).also { strip ->
+            // Register the chip's KeyTheme so dynamic color changes are reflected at draw time.
+            themeManager.addKeyTheme(strip.chip.keyTheme())
             // Legacy single-source tap path kept for backward compatibility.
             strip.onSuggestionTapped = {
                 commitMathFromSource()
@@ -243,6 +318,9 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         }
 
         keyPlane = KeyPlaneView(this).also { plane ->
+            // Register the view's KeyTheme so dynamic color changes from TallyThemeManager are
+            // reflected in the key bed on the next onDraw without a view recreate.
+            themeManager.addKeyTheme(plane.theme)
             plane.keyListener = { key ->
                 val ic = currentInputConnection
                 if (ic != null) handleKey(key, ic)
@@ -263,6 +341,10 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
                 controller.deleteWordBefore(ic)
                 requestStripUpdate()
                 syncKeyPlaneRows()
+            }
+            plane.cursorStepListener = cursorStep@{ steps, select ->
+                val ic = currentInputConnection ?: return@cursorStep
+                controller.moveCursor(steps, select, ic)
             }
             root.addView(plane)
         }
@@ -294,12 +376,17 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
 
+        // Re-read the persisted theme preset on every field entry so a settings change made while
+        // the keyboard was hidden is picked up without restarting the service.
+        themeManager.preset = ThemePreset.fromKey(prefs.themePresetKey)
+
         fieldPolicy = FieldPolicyFactory.from(info)
 
         controller.configure(info, restarting, currentInputConnection)
 
         keyPlane?.previewMasked = fieldPolicy.previewMasked
         syncKeyPlaneRows()
+        syncFormFactor()
 
         stripCoordinator?.clear()
         mathSource.clear()
@@ -343,16 +430,31 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         super.onComputeInsets(outInsets)
         outInsets ?: return
 
-        val dm = resources.displayMetrics
-        val rowCount = (keyPlane?.currentRows?.size ?: DEFAULT_ROW_COUNT).coerceAtLeast(1)
-
-        val keyPlaneHeight = KeyboardHeightPolicy.heightPx(
-            screenWidthPx  = dm.widthPixels,
-            screenHeightPx = dm.heightPixels,
-            density        = dm.density,
-            rowCount       = rowCount,
-        )
         val stripHeight = resources.getDimensionPixelSize(R.dimen.suggestion_strip_height)
+
+        // Use the transform cached by the last onMeasure pass. If the key plane has not yet
+        // been measured (e.g., first call before layout), fall back to the height policy.
+        val transform = keyPlane?.lastTransform
+
+        if (transform != null && !transform.claimsInsets) {
+            // FLOATING mode: the keyboard overlays content and must not push the host upward.
+            // Report zero insets so the focused field stays visible behind the floating panel.
+            outInsets.contentTopInsets = 0
+            outInsets.visibleTopInsets = 0
+            outInsets.touchableInsets  = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT
+            return
+        }
+
+        val keyPlaneHeight = transform?.heightPx ?: run {
+            val dm = resources.displayMetrics
+            val rowCount = (keyPlane?.currentRows?.size ?: DEFAULT_ROW_COUNT).coerceAtLeast(1)
+            KeyboardHeightPolicy.heightPx(
+                screenWidthPx  = dm.widthPixels,
+                screenHeightPx = dm.heightPixels,
+                density        = dm.density,
+                rowCount       = rowCount,
+            )
+        }
         val totalHeight = keyPlaneHeight + stripHeight
 
         outInsets.contentTopInsets = totalHeight
@@ -667,14 +769,19 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
      * alphabetic layers. Numeric and symbol layers are sourced from JSON data assets via
      * [LayoutLoader]. The key plane redraws and the a11y tree is invalidated automatically
      * via [KeyPlaneView.currentRows].
+     *
+     * Voice key visibility is controlled here: when the opt-in voice feature is disabled
+     * the VOICE key is stripped from all rows so users who have not enabled voice input
+     * never see the microphone key. This keeps the layout JSON as the canonical source of
+     * truth while allowing the preference to gate the visible surface.
      */
     private fun syncKeyPlaneRows() {
         val plane = keyPlane ?: return
         val baseRows = when (controller.currentState()) {
-            KeyboardState.ALPHA_LOWER -> KeyboardLayout.ALPHA_LOWER
+            KeyboardState.ALPHA_LOWER -> activeAlphaRows()
             KeyboardState.ALPHA_UPPER -> when (controller.currentShiftState()) {
-                dev.tally.keyboard.engine.ShiftState.LOCKED -> KeyboardLayout.ALPHA_LOCKED
-                else -> KeyboardLayout.ALPHA_UPPER
+                dev.tally.keyboard.engine.ShiftState.LOCKED -> activeAlphaRows().uppercased(lockedShift = true)
+                else -> activeAlphaRows().uppercased(lockedShift = false)
             }
             KeyboardState.NUMERIC -> layoutLoader.numericRows()
             KeyboardState.SYMBOLS -> layoutLoader.symbolRows()
@@ -686,11 +793,167 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
             baseRows
         }
 
-        plane.currentRows = rows
+        // Strip the VOICE key from all rows when the feature is disabled so users who have not
+        // opted in to voice input never see the microphone key. The key remains in the layout
+        // asset; its visibility is gated here by the preference rather than by a separate layout.
+        val visibleRows = if (prefs.voiceInputEnabled) {
+            rows
+        } else {
+            rows.map { row ->
+                KeyRow(
+                    keys             = row.keys.filter { it.code != KeyCode.Voice },
+                    startOffsetUnits = row.startOffsetUnits,
+                )
+            }
+        }
+
+        plane.currentRows = visibleRows
+        // Update selection mode so space-swipe extends selection while shift is latched/locked.
+        plane.cursorSelectMode = controller.currentShiftState() != dev.tally.keyboard.engine.ShiftState.OFF
     }
+
+    /**
+     * Returns the lower-case alpha rows for the currently active subtype.
+     *
+     * For the English QWERTY subtype the result comes from the same JSON asset that is
+     * also used as the reference layout. The result is cached by [LayoutLoader].
+     */
+    private fun activeAlphaRows(): List<KeyRow> =
+        layoutLoader.alphaRows(SubtypeRegistry.assetPath(activeSubtype))
 
     private fun isAlphaState(state: KeyboardState): Boolean =
         state == KeyboardState.ALPHA_LOWER || state == KeyboardState.ALPHA_UPPER
+
+    /**
+     * Advances [activeSubtype] to the next entry in the cycle, persists the choice, and
+     * re-syncs the key plane so the new layout is visible immediately.
+     *
+     * Called from [controller.globeListener] on the main thread after the controller has
+     * already finished any in-progress composing region. Clearing the [LayoutLoader] cache
+     * is not necessary because each subtype maps to a distinct asset path and the loader
+     * caches by path — the new subtype's rows will be loaded once and then stay cached.
+     */
+    private fun cycleSubtype() {
+        activeSubtype = subtypeList.next(activeSubtype)
+        prefs.activeSubtypeId = activeSubtype.id
+        syncKeyPlaneRows()
+    }
+
+    /**
+     * Starts an on-device voice recognition session if the feature is enabled and permission
+     * has been granted at runtime.
+     *
+     * The voice feature is opt-in (T5.2): the user must first enable it in Settings. When
+     * enabled, the OS on-device recognizer is invoked. If the recognizer is unavailable on
+     * the device (e.g. AOSP without Google recognition APK) the user sees no chip because
+     * this is a best-effort feature with graceful degradation — the keyboard remains fully
+     * functional without it.
+     *
+     * RECORD_AUDIO is a runtime permission; if not yet granted the request is routed through
+     * the launcher activity. Attempting to create a SpeechRecognizer without this permission
+     * granted results in an immediate ERROR_INSUFFICIENT_PERMISSIONS callback from the OS.
+     *
+     * When recognition succeeds the transcript is committed as plain text at the cursor
+     * position, followed by a trailing space so the next word begins cleanly.
+     */
+    private fun startVoiceInput() {
+        if (!prefs.voiceInputEnabled) return
+
+        // Runtime permission check. On pre-M devices (not in our minSdk range) checkSelfPermission
+        // always returns PERMISSION_GRANTED so the branch below is unreachable there.
+        val granted = android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != granted) {
+            // Permission not yet granted; the engine will surface ERROR_INSUFFICIENT_PERMISSIONS
+            // from the OS, which maps to VoiceError.RECOGNIZER_UNAVAILABLE. Log at warn so the
+            // condition is visible in debug without revealing any field content.
+            Log.w(TAG, "Voice key pressed but RECORD_AUDIO not granted; recognition will fail")
+        }
+
+        voiceEngine.startListening(
+            onResult = { transcript ->
+                val ic = currentInputConnection ?: return@startListening
+                ic.beginBatchEdit()
+                controller.mirror.onBatchEditBegin()
+                try {
+                    // Commit the transcript followed by a space so typing continues cleanly.
+                    if (!ic.commitText("$transcript ", 1)) {
+                        Log.w(TAG, "Voice: commitText returned false; transcript may not have been inserted")
+                    }
+                } finally {
+                    ic.endBatchEdit()
+                    controller.mirror.onBatchEditEnd()
+                }
+                requestStripUpdate()
+            },
+            onError = { error ->
+                // Failures are silent from the user's perspective — voice input is
+                // best-effort and the keyboard operates normally without it.
+                Log.w(TAG, "Voice recognition error: $error")
+            },
+        )
+    }
+
+    /**
+     * Returns a copy of these rows with every [KeyCode.Char] key uppercased.
+     *
+     * Special keys (shift, backspace, globe, …) are left unchanged except that when
+     * [lockedShift] is true the shift key label is replaced with the caps-lock glyph.
+     */
+    private fun List<KeyRow>.uppercased(lockedShift: Boolean): List<KeyRow> = map { row ->
+        KeyRow(
+            keys = row.keys.map { key ->
+                when {
+                    key.code is KeyCode.Char ->
+                        key.copy(
+                            code  = KeyCode.Char(key.label[0].uppercaseChar()),
+                            label = key.label.uppercase(),
+                        )
+                    key.code == KeyCode.Shift && lockedShift ->
+                        key.copy(label = "⇪")  // ⇪ caps-lock indicator
+                    else -> key
+                }
+            },
+            startOffsetUnits = row.startOffsetUnits,
+        )
+    }
+
+    /**
+     * Reads the active form-factor preference and applies the corresponding geometry
+     * transform to [keyPlane].
+     *
+     * Called on each [onStartInputView] so a mode change made in Settings takes effect
+     * on the next field focus without restarting the service. Also adjusts the horizontal
+     * margin of the key plane in its parent [LinearLayout] for ONE_HANDED mode so the empty
+     * half of the keyboard is visually offset toward the active hand.
+     */
+    private fun syncFormFactor() {
+        val plane = keyPlane ?: return
+        val mode  = FormFactorMode.fromKey(prefs.formFactorKey)
+
+        plane.formFactor      = mode
+        plane.oneHandedRight  = prefs.oneHandedRight
+        plane.floatingOffsetX = prefs.floatingOffsetX
+        plane.floatingOffsetY = prefs.floatingOffsetY
+
+        // For ONE_HANDED mode, shift the key plane horizontally within the LinearLayout so it
+        // sits flush against the chosen edge. Other modes reset the margin to zero.
+        val lp = plane.layoutParams as? android.widget.LinearLayout.LayoutParams
+        if (lp != null) {
+            if (mode == FormFactorMode.ONE_HANDED) {
+                val dm = resources.displayMetrics
+                val fullWidth = dm.widthPixels
+                val keyWidth = (fullWidth * FormFactorTransform.ONE_HANDED_WIDTH_FRACTION).toInt()
+                    .coerceAtLeast(1)
+                val freeSpace = fullWidth - keyWidth
+                lp.leftMargin  = if (prefs.oneHandedRight) freeSpace else 0
+                lp.rightMargin = if (prefs.oneHandedRight) 0 else freeSpace
+            } else {
+                lp.leftMargin  = 0
+                lp.rightMargin = 0
+            }
+            plane.layoutParams = lp
+        }
+    }
 
     private companion object {
         const val DEFAULT_ROW_COUNT = 4

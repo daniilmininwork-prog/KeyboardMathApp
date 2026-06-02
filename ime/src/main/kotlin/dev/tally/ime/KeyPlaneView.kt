@@ -7,15 +7,21 @@ import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
 import android.util.Log
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.view.ViewCompat
+import dev.tally.keyboard.engine.CursorController
+import dev.tally.keyboard.engine.FormFactorMode
+import dev.tally.keyboard.engine.FormFactorTransform
+import dev.tally.keyboard.engine.KeyDef
 import dev.tally.keyboard.engine.KeyGeometry
 import dev.tally.keyboard.engine.KeyId
 import dev.tally.keyboard.engine.KeyRepeatController
 import dev.tally.keyboard.engine.KeyboardHeightPolicy
 import dev.tally.keyboard.engine.PointerTrackerPool
 import dev.tally.keyboard.engine.ResolvedKey
+import dev.tally.keyboard.engine.SpecialCode
 
 /**
  * The key bed: a custom Canvas-drawn view that owns key rendering, multitouch dispatch,
@@ -99,6 +105,86 @@ internal class KeyPlaneView @JvmOverloads constructor(
     var wordDeleteListener: (() -> Unit)? = null
 
     /**
+     * Called for each discrete cursor-step produced by a space-bar swipe gesture (T4.4).
+     *
+     * [steps] is negative for leftward (cursor back) and positive for rightward (cursor
+     * forward). The magnitude is the number of positions to advance in one callback; the
+     * IME service must fire one [android.view.KeyEvent] (or [InputConnection.setSelection]
+     * delta) per unit.
+     *
+     * [select] is true when the gesture should extend the selection rather than move the
+     * bare cursor — set by the IME service based on the current shift state.
+     *
+     * Only called when [steps] != 0.  Fires on the main thread.
+     */
+    var cursorStepListener: ((steps: Int, select: Boolean) -> Unit)? = null
+
+    /**
+     * Whether the current shift state means the space-swipe extends selection.
+     *
+     * Set by [TallyInputMethodService] in sync with [KeyboardController.currentShiftState].
+     * The cursor controller reads this flag via [CursorController.selectionMode].
+     */
+    var cursorSelectMode: Boolean = false
+        set(value) {
+            field = value
+            cursorController.selectionMode = value
+        }
+
+    // ── Form-factor (T4.6) ────────────────────────────────────────────────────
+
+    /**
+     * Active form-factor mode; triggers a layout pass and redraw when changed.
+     *
+     * Set by [TallyInputMethodService] from [TallyPreferences.formFactorKey] on each
+     * [onStartInputView] so that settings changes applied while the keyboard was hidden
+     * take effect without a service restart.
+     */
+    var formFactor: FormFactorMode = FormFactorMode.NORMAL
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+            invalidate()
+        }
+
+    /** Whether the one-handed keyboard aligns to the right edge. */
+    var oneHandedRight: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (formFactor == FormFactorMode.ONE_HANDED) {
+                requestLayout()
+            }
+        }
+
+    /** Horizontal pixel offset for FLOATING mode. Clamped inside [FormFactorTransform]. */
+    var floatingOffsetX: Int = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            if (formFactor == FormFactorMode.FLOATING) requestLayout()
+        }
+
+    /** Vertical pixel offset for FLOATING mode. */
+    var floatingOffsetY: Int = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            if (formFactor == FormFactorMode.FLOATING) requestLayout()
+        }
+
+    /**
+     * The most recently resolved [FormFactorTransform.Result].
+     *
+     * Computed during [onMeasure] from the current [formFactor] and display metrics.
+     * Read by [TallyInputMethodService.onComputeInsets] to determine whether to claim
+     * bottom insets (FLOATING mode claims none) and what height to report.
+     */
+    internal var lastTransform: FormFactorTransform.Result? = null
+        private set
+
+    /**
      * The current keyboard layout geometry.
      *
      * Set by the IME service (or [KeyboardController]) whenever the active layout
@@ -123,6 +209,13 @@ internal class KeyPlaneView @JvmOverloads constructor(
             field = value
             a11yHelper.rows = value
             a11yHelper.invalidateAllKeys()
+            // A shift/layer swap keeps the same viewport size, so onSizeChanged may not fire; route
+            // through requestLayout so the geometry is rebuilt in onLayout against the new rows.
+            // Deferring (rather than rebuilding inline) keeps the unit tests' explicitly-injected
+            // currentGeometry authoritative — requestLayout does not run a synchronous layout pass
+            // in Robolectric, whereas production schedules one that lands in onLayout below.
+            requestLayout()
+            invalidate()
         }
 
     /**
@@ -142,9 +235,42 @@ internal class KeyPlaneView @JvmOverloads constructor(
     private val SWIPE_LEFT_THRESHOLD_PX: Float =
         SWIPE_LEFT_THRESHOLD_DP * resources.displayMetrics.density
 
-    // Pre-allocated; color is refreshed from the theme token at the start of each draw so
-    // a light↔dark switch takes effect on the next frame without recreating the view.
-    private val bgPaint = Paint()
+    // ── Space-bar cursor control (T4.4) ───────────────────────────────────────
+
+    // Density-scaled cursor controller. Dead zone and step size are in view-pixel space so the
+    // gesture feels identical on all screen densities.
+    private val cursorController: CursorController = run {
+        val density = resources.displayMetrics.density
+        CursorController(
+            deadZonePx = CursorController.DEFAULT_DEAD_ZONE_PX * density,
+            stepPx     = CursorController.DEFAULT_STEP_PX * density,
+        )
+    }
+
+    // pointerId of the pointer that pressed the space key, or NO_ACTIVE_POINTER.
+    private var spacePointerId: Int = NO_ACTIVE_POINTER
+
+    // Pre-allocated to avoid in-draw allocation. Colors are refreshed from theme tokens at the
+    // start of each onDraw so a light↔dark switch takes effect on the next frame without
+    // recreating the view. Mirrors TallyKeyboardView's paint set so rendering matches the
+    // reference key bed exactly.
+    private val bgPaint         = Paint()
+    private val keyPaint        = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val specialKeyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val textPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Half of the inter-key gaps. These are visual insets applied at draw time only (Step 2);
+    // the geometry stores full key rects so touch targets fill the gap and never shrink
+    // (see PointerTrackerPool hit-test, which uses ResolvedKey.contains on the full rect).
+    private val hGapHalf = dpToPx(3f)   // half of the 6dp horizontal gap between keys
+    private val vGapHalf = dpToPx(4f)   // half of the 8dp vertical gap between rows
+
+    // Key-face metrics, matching TallyKeyboardView so the two views render identically.
+    private val cornerRadius      = dpToPx(8f)
+    private val keyTextSizePx     = spToPx(18f)
+    private val specialTextSizePx = spToPx(14f)
 
     // One preview popup per pointer slot. The map is keyed by pointerId so
     // simultaneous presses each get their own bubble.
@@ -187,25 +313,105 @@ internal class KeyPlaneView @JvmOverloads constructor(
     // ── Measurement ───────────────────────────────────────────────────────────
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val w = MeasureSpec.getSize(widthMeasureSpec)
         val dm = resources.displayMetrics
-        val h = KeyboardHeightPolicy.heightPx(
-            screenWidthPx  = dm.widthPixels,
-            screenHeightPx = dm.heightPixels,
-            density        = dm.density,
-            rowCount       = currentRows.size.coerceAtLeast(DEFAULT_ROW_COUNT),
+        // Use the measure-spec width as the viewport width so the view honours
+        // whatever width the parent assigns (e.g. 1080px in tests, full screen in prod).
+        val specW = MeasureSpec.getSize(widthMeasureSpec).takeIf { it > 0 } ?: dm.widthPixels
+        val transform = FormFactorTransform.resolve(
+            mode              = formFactor,
+            viewportWidthPx   = specW,
+            viewportHeightPx  = dm.heightPixels,
+            density           = dm.density,
+            rowCount          = currentRows.size.coerceAtLeast(DEFAULT_ROW_COUNT),
+            oneHandedRight    = oneHandedRight,
+            floatingOffsetXPx = floatingOffsetX,
+            floatingOffsetYPx = floatingOffsetY,
         )
-        setMeasuredDimension(w, h)
+        lastTransform = transform
+        setMeasuredDimension(transform.widthPx, transform.heightPx)
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        // Build geometry from the final pixel bounds. onLayout (not onSizeChanged) is used because a
+        // shift/layer swap changes currentRows without changing the view size — onSizeChanged would
+        // not fire then, but onLayout runs on every requestLayout-driven pass, so the geometry stays
+        // in lock-step with currentRows. FormFactorTransform has already sized the view by this point.
+        val w = right - left
+        val h = bottom - top
+        if (w > 0 && h > 0) {
+            currentGeometry = buildGeometry(w, h, currentRows)
+        }
     }
 
     // Theme token provider — resolves colors from the current Context configuration on each access.
-    private val theme = dev.tally.design.KeyTheme(context)
+    // Exposed internally so TallyInputMethodService can register it with TallyThemeManager for
+    // dynamic color fan-out without coupling this view to the manager directly.
+    internal val theme = dev.tally.design.KeyTheme(context)
 
     // ── Drawing ───────────────────────────────────────────────────────────────
 
     override fun onDraw(canvas: Canvas) {
-        bgPaint.color = theme.keyboardBg
+        // Refresh every paint from the theme tokens before drawing so a light↔dark switch (or a
+        // dynamic-color update) is reflected on the next frame without recreating the view.
+        bgPaint.color         = theme.keyboardBg
+        keyPaint.color        = theme.keyBg
+        specialKeyPaint.color = theme.keySpecialBg
+        textPaint.color       = theme.keyText
+
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+        // In SPLIT mode, overdraw the central gap with a darkened strip so the keyboard
+        // visually appears as two separate halves. The touch areas are unchanged — the gap
+        // simply has no keys mapped to it in the geometry.
+        if (formFactor == FormFactorMode.SPLIT && width > 0) {
+            val gapCentreX = width / 2f
+            val halfGap = SPLIT_GAP_PX * resources.displayMetrics.density / 2f
+            // Darken/lighten the keyboard background slightly to produce a neutral groove.
+            val base = theme.keyboardBg
+            bgPaint.color = android.graphics.Color.argb(
+                0xFF,
+                ((android.graphics.Color.red(base) * SPLIT_GAP_DIM_FACTOR).toInt()).coerceIn(0, 255),
+                ((android.graphics.Color.green(base) * SPLIT_GAP_DIM_FACTOR).toInt()).coerceIn(0, 255),
+                ((android.graphics.Color.blue(base) * SPLIT_GAP_DIM_FACTOR).toInt()).coerceIn(0, 255),
+            )
+            canvas.drawRect(
+                gapCentreX - halfGap, 0f,
+                gapCentreX + halfGap, height.toFloat(),
+                bgPaint,
+            )
+        }
+
+        // Draw each key from the geometry — the same rects PointerTrackerPool hit-tests against,
+        // so what the user sees and what they touch are guaranteed to agree. Drawing straight off
+        // the resolved KeyDef (rather than re-deriving from currentRows per key) keeps the loop
+        // allocation-free and reads the same data the touch/a11y paths use.
+        val geometry = currentGeometry ?: return
+        for (resolvedKey in geometry.keys) {
+            val keyDef = resolvedKey.keyDef
+
+            // Visual inset only: shrink the drawn face by the inter-key gap so neighbouring keys
+            // read as separate. The full rect remains the touch target (geometry is uninset), so
+            // there are no dead gaps between keys.
+            val left   = resolvedKey.left + hGapHalf
+            val top    = resolvedKey.top + vGapHalf
+            val right  = resolvedKey.right - hGapHalf
+            val bottom = resolvedKey.bottom - vGapHalf
+
+            // Resting key face only: special vs normal, matching TallyKeyboardView. Press feedback
+            // is carried by the key-preview bubble and long-press tray popups, not by repainting
+            // the key here — the touch path deliberately never invalidates on DOWN/MOVE, so a
+            // per-key pressed paint would be dead state that never reaches the canvas.
+            val paint = if (keyDef.isSpecial) specialKeyPaint else keyPaint
+            canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, paint)
+
+            // Skip the Space label (it stays blank, per the reference) and any code-only key.
+            if (keyDef.code != SpecialCode.SPACE && keyDef.label.isNotEmpty()) {
+                textPaint.textSize = if (keyDef.isSpecial) specialTextSizePx else keyTextSizePx
+                val textY = resolvedKey.centerY - (textPaint.ascent() + textPaint.descent()) / 2f
+                canvas.drawText(keyDef.label, resolvedKey.centerX, textY, textPaint)
+            }
+        }
     }
 
     // ── Touch dispatch ────────────────────────────────────────────────────────
@@ -246,6 +452,14 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 if (layoutKey?.code == KeyCode.Backspace) {
                     armBackspaceRepeat(pointerId, x)
                 }
+
+                // Space-bar cursor control (T4.4): arm the controller for the pointer that
+                // lands on the space key. Only one space pointer is tracked at a time.
+                if (layoutKey?.code == KeyCode.Space && spacePointerId == NO_ACTIVE_POINTER) {
+                    spacePointerId = pointerId
+                    cursorController.selectionMode = cursorSelectMode
+                    cursorController.onSpaceDown(x)
+                }
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -277,6 +491,15 @@ internal class KeyPlaneView @JvmOverloads constructor(
                             wordDeleteListener?.invoke()
                         }
                     }
+
+                    // Space-bar cursor-control: feed move samples and fire step callbacks
+                    // for each discrete cursor position crossed (T4.4).
+                    if (pointerId == spacePointerId) {
+                        val steps = cursorController.onMove(x)
+                        if (steps != 0) {
+                            cursorStepListener?.invoke(steps, cursorController.selectionMode)
+                        }
+                    }
                 }
             }
 
@@ -287,6 +510,13 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 if (pointerId == backspacePointerId) {
                     cancelBackspaceRepeat()
                 }
+
+                // Space-bar cursor-control: resolve and clear the cursor gesture before the
+                // normal key-commit logic so we know whether to suppress the space character.
+                val spaceGestureConsumed = if (pointerId == spacePointerId) {
+                    spacePointerId = NO_ACTIVE_POINTER
+                    cursorController.onUp()   // returns true ↔ gesture was active
+                } else false
 
                 if (pointerId in longPressActive) {
                     // Long-press was triggered for this pointer. Commit the highlighted alternate
@@ -316,7 +546,7 @@ internal class KeyPlaneView @JvmOverloads constructor(
                     tearDownLongPress(pointerId)
                 } else {
                     val keyId = pool.onUp(pointerId)
-                    if (keyId != null) {
+                    if (keyId != null && !spaceGestureConsumed) {
                         resolveKey(keyId)?.let { key -> keyListener?.invoke(key) }
                     }
                 }
@@ -328,6 +558,7 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 tearDownAllLongPresses()
                 dismissAllPreviews()
                 cancelBackspaceRepeat()
+                cancelSpaceCursorGesture()
                 pool.onCancel()
             }
         }
@@ -363,6 +594,96 @@ internal class KeyPlaneView @JvmOverloads constructor(
         val row = currentRows.getOrNull(keyId.rowIndex) ?: return null
         return row.keys.getOrNull(keyId.keyIndex)
     }
+
+    // ── Geometry ──────────────────────────────────────────────────────────────
+
+    /**
+     * Builds the pixel [KeyGeometry] for [rows] within a [w]×[h] viewport.
+     *
+     * Layout model mirrors [TallyKeyboardView.recomputeRects]: the row width is split into ten
+     * equal base units, each key occupies [Key.widthUnits] of them, and short rows are centred via
+     * [KeyRow.startOffsetUnits]. RTL layouts mirror key order so the data-file-rightmost key sits on
+     * the physical right.
+     *
+     * The rects stored here are the FULL key cells with no gap inset — they are the hit-test targets
+     * consumed by [PointerTrackerPool], so insetting them would shrink the touch area. The visual
+     * inter-key gap ([hGapHalf]/[vGapHalf]) is applied at draw time only.
+     *
+     * Each [KeyId] is `(rowIndex, keyIndex)` in visual left-to-right order, matching exactly what
+     * [resolveKey] unpacks from [currentRows] so geometry and rows stay byte-compatible.
+     */
+    private fun buildGeometry(w: Int, h: Int, rows: List<KeyRow>): KeyGeometry {
+        val rowH = if (rows.isEmpty()) h.toFloat() else h.toFloat() / rows.size
+        val unit = w.toFloat() / 10f   // base unit = 1/10 of the row width
+
+        val isRtl = layoutDirection == LAYOUT_DIRECTION_RTL
+        val resolved = ArrayList<ResolvedKey>()
+
+        rows.forEachIndexed { rowIdx, row ->
+            val top = rowH * rowIdx
+            val bottom = rowH * (rowIdx + 1)
+
+            // keyIndex must reflect visual position, so mirror the key order itself in RTL rather
+            // than just the x-arithmetic — the index then matches the visual left-to-right slot.
+            val keysInOrder = if (isRtl) row.keys.reversed() else row.keys
+            var x = row.startOffsetUnits * unit
+
+            keysInOrder.forEachIndexed { keyIdx, key ->
+                val keyW = key.widthUnits * unit
+                val left = x
+                val right = x + keyW
+                x += keyW
+                resolved += ResolvedKey(
+                    id = KeyId(rowIdx, keyIdx),
+                    keyDef = key.toKeyDef(),
+                    left = left,
+                    top = top,
+                    right = right,
+                    bottom = bottom,
+                )
+            }
+        }
+
+        return KeyGeometry(
+            viewportWidth = w,
+            viewportHeight = h,
+            rowHeight = rowH,
+            keys = resolved,
+        )
+    }
+
+    /**
+     * Projects an ime [Key] onto the engine's [KeyDef] carried inside [ResolvedKey].
+     *
+     * The geometry layer is Android-free and speaks [KeyDef], so the label/moreKeys/isSpecial
+     * the touch and a11y paths read off the resolved key are copied here. The integer [KeyDef.code]
+     * is the primary code point for character keys and the matching [SpecialCode] sentinel otherwise.
+     */
+    private fun Key.toKeyDef(): KeyDef = KeyDef(
+        code = when (val c = code) {
+            is KeyCode.Char       -> c.value.code
+            KeyCode.Backspace     -> SpecialCode.DELETE
+            KeyCode.Enter         -> SpecialCode.ENTER
+            KeyCode.Space         -> SpecialCode.SPACE
+            KeyCode.Shift         -> SpecialCode.SHIFT
+            KeyCode.SwitchToNumeric -> SpecialCode.NUMERIC
+            KeyCode.SwitchToAlpha   -> SpecialCode.ALPHA
+            KeyCode.SwitchToSymbols -> SpecialCode.SYMBOLS
+            KeyCode.ToggleNumberRow -> SpecialCode.NUMBER_ROW_TOGGLE
+            KeyCode.Globe         -> SpecialCode.GLOBE
+            KeyCode.Voice         -> SpecialCode.VOICE
+        },
+        label = label,
+        moreKeys = moreKeys,
+        width = widthUnits,
+        isSpecial = isSpecial,
+    )
+
+    private fun dpToPx(dp: Float): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics)
+
+    private fun spToPx(sp: Float): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, resources.displayMetrics)
 
     // ── Long-press lifecycle ──────────────────────────────────────────────────
 
@@ -435,6 +756,13 @@ internal class KeyPlaneView @JvmOverloads constructor(
         wordDeleteFired     = false
     }
 
+    // ── Space-cursor gesture lifecycle ────────────────────────────────────────
+
+    private fun cancelSpaceCursorGesture() {
+        cursorController.reset()
+        spacePointerId = NO_ACTIVE_POINTER
+    }
+
     // ── Preview lifecycle helpers ─────────────────────────────────────────────
 
     private fun dismissPreview(pointerId: Int) {
@@ -471,12 +799,27 @@ internal class KeyPlaneView @JvmOverloads constructor(
     internal fun longPressSelectedIndex(pointerId: Int): Int =
         longPressPopups[pointerId]?.selectedIndex ?: -1
 
+    /**
+     * Returns true when the cursor-control gesture is currently active for the space key.
+     * Exposed for test assertions only.
+     */
+    internal fun isCursorGestureActive(): Boolean = cursorController.gestureActive
+
     private companion object {
         const val TAG = "KeyPlaneView"
 
         // Fallback row count used when currentRows is empty (e.g. before the first layout sync).
         // Matches the standard QWERTY row count: letter rows + bottom action row.
         const val DEFAULT_ROW_COUNT = 4
+
+        // Width (in dp) of the visual gap drawn between the two halves in SPLIT mode.
+        // Wide enough to be a recognisable separator without wasting touch-target space.
+        const val SPLIT_GAP_PX = 24f
+
+        // The split-gap strip is drawn at this fraction of the keyboard background's RGB channels.
+        // Values < 1.0 darken the gap relative to the keyboard background in light theme;
+        // the same factor makes dark-theme backgrounds slightly lighter via the complementary path.
+        const val SPLIT_GAP_DIM_FACTOR = 0.80f
 
         // Standard long-press interval for keyboard key alternates. Android's own ViewConfiguration
         // uses 400 ms for long-press; matching that provides a consistent feel.

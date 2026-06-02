@@ -32,6 +32,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         findPreference<ListPreference>(TallyPreferences.KEY_PERCENT_MODE)
             ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
 
+        findPreference<ListPreference>(TallyPreferences.KEY_FORM_FACTOR)
+            ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+
         findPreference<Preference>("overlay")?.setOnPreferenceClickListener {
             startActivity(Intent(requireContext(), OverlayConsentActivity::class.java))
             true

@@ -78,6 +78,28 @@
     <string name="main_btn_setup">Set up Tally</string>
     <string name="main_btn_try_again">Try it again</string>
 
+    <!-- Form factor settings -->
+    <string name="pref_form_factor_title">Keyboard layout</string>
+    <string name="pref_one_handed_right_title">One-handed: right side</string>
+    <string name="pref_one_handed_right_summary">Anchor the condensed keyboard to the right edge instead of the left</string>
+
+    <string-array name="pref_form_factor_entries">
+        <item>Normal</item>
+        <item>One-handed</item>
+        <item>Split</item>
+        <item>Floating</item>
+    </string-array>
+    <string-array name="pref_form_factor_values">
+        <item>NORMAL</item>
+        <item>ONE_HANDED</item>
+        <item>SPLIT</item>
+        <item>FLOATING</item>
+    </string-array>
+
+    <!-- Voice input (T5.2) -->
+    <string name="pref_voice_input_title">Voice typing</string>
+    <string name="pref_voice_input_summary">Show a microphone key; uses the on-device speech recognizer (opt-in, requires microphone permission)</string>
+
     <!-- Overlay mode settings entry -->
     <string name="pref_overlay_title">Overlay mode</string>
     <string name="pref_overlay_summary_enabled">Active — works above any keyboard</string>

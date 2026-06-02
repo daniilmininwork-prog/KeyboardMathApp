@@ -2,6 +2,8 @@
 <resources>
     <string name="ime_name">Tally</string>
     <string name="subtype_en">English (US)</string>
+    <string name="subtype_fr">Français (FR)</string>
+    <string name="subtype_de">Deutsch (DE)</string>
     <string name="chip_insert_description">Insert result %s</string>
     <string name="word_candidate_description">Insert word %s</string>
 </resources>

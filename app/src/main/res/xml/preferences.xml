@@ -68,6 +68,29 @@
         app:defaultValue=""
         app:iconSpaceReserved="false" />
 
+    <ListPreference
+        app:key="form_factor"
+        app:title="@string/pref_form_factor_title"
+        app:summary="%s"
+        app:entries="@array/pref_form_factor_entries"
+        app:entryValues="@array/pref_form_factor_values"
+        app:defaultValue="NORMAL"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="one_handed_right"
+        app:title="@string/pref_one_handed_right_title"
+        app:summary="@string/pref_one_handed_right_summary"
+        app:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="voice_input_enabled"
+        app:title="@string/pref_voice_input_title"
+        app:summary="@string/pref_voice_input_summary"
+        app:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
     <Preference
         app:key="overlay"
         app:title="@string/pref_overlay_title"

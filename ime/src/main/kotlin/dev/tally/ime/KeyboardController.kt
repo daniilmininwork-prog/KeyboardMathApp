@@ -1,5 +1,6 @@
 package dev.tally.ime
 
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -61,6 +62,24 @@ internal class KeyboardController {
      * to re-sync the key plane rows.
      */
     var numberRowChangeListener: ((Boolean) -> Unit)? = null
+
+    /**
+     * Called on the main thread when the globe key is pressed.
+     *
+     * The IME service wires this to cycle to the next enabled subtype and reload the
+     * active layout. Composing state is finished before the callback fires so the
+     * new layout starts from a clean input state.
+     */
+    var globeListener: (() -> Unit)? = null
+
+    /**
+     * Called on the main thread when the voice key is pressed.
+     *
+     * The IME service wires this to start/stop the [OsVoiceInputEngine]. Composing
+     * state is finished before the callback fires so the recognized text inserts at a
+     * committed position rather than replacing a live composing region.
+     */
+    var voiceListener: (() -> Unit)? = null
 
     // Populated once the IME session has an active InputConnection.
     private var inputConnectionProvider: (() -> InputConnection?)? = null
@@ -160,6 +179,40 @@ internal class KeyboardController {
     }
 
     /**
+     * Move the cursor (or extend the selection) by [steps] positions.
+     *
+     * Triggered by the space-bar swipe gesture (T4.4). Each unit of [steps] is one
+     * character position: negative = left, positive = right.
+     *
+     * When [select] is true (shift is currently latched or locked) the movement extends
+     * the selection rather than moving the bare cursor. The composing region is finished
+     * before movement so the cursor position is unambiguous and the editor is never left
+     * with a dangling underline while selection is active.
+     *
+     * Movement is delivered via [KeyEvent] (DPAD_LEFT / DPAD_RIGHT with optional
+     * SHIFT_LEFT meta) which is the canonical way for an IME to drive cursor movement
+     * in a TYPE_NULL-safe manner across all editor implementations.
+     */
+    fun moveCursor(steps: Int, select: Boolean, ic: InputConnection) {
+        if (steps == 0) return
+
+        // Finish any composing region so the cursor sits at a committed position.
+        if (composing.isComposing) {
+            composing.finishComposing(ic)
+        }
+
+        val keyCode = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+        val metaState = if (select) KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON else 0
+        val count = kotlin.math.abs(steps)
+        val eventTime = SystemClock.uptimeMillis()
+
+        repeat(count) {
+            ic.sendKeyEvent(KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
+            ic.sendKeyEvent(KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP,   keyCode, 0, metaState))
+        }
+    }
+
+    /**
      * Process a key emitted by the key plane.
      *
      * The IME service calls this from the main thread; it is the sole path from hardware/
@@ -195,6 +248,17 @@ internal class KeyboardController {
             KeyCode.ToggleNumberRow -> {
                 numberRowEnabled = !numberRowEnabled
                 numberRowChangeListener?.invoke(numberRowEnabled)
+            }
+            KeyCode.Globe -> {
+                // Finish composing before switching layouts so the new layout starts clean.
+                composing.finishComposing(ic)
+                globeListener?.invoke()
+            }
+            KeyCode.Voice -> {
+                // Finish composing before starting voice so the transcript inserts at a
+                // committed cursor position rather than mid-word.
+                composing.finishComposing(ic)
+                voiceListener?.invoke()
             }
         }
     }

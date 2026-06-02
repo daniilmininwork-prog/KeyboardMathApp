@@ -78,6 +78,18 @@ internal class LayoutLoader(context: Context) {
     fun numberRow(): List<KeyRow> =
         load("layouts/number_row.json", fallback = emptyList())
 
+    /**
+     * Returns the alpha (QWERTY/AZERTY/QWERTZ) rows for the given asset path.
+     *
+     * Loaded and cached on first access for each distinct [assetPath]. Falls back to
+     * [KeyboardLayout.ALPHA_LOWER] on asset failure so the keyboard stays usable.
+     *
+     * @param assetPath Asset-relative path, e.g. "layouts/fr_FR_AZERTY.json".
+     */
+    // Must be called on the main thread; see class KDoc for thread-safety contract.
+    fun alphaRows(assetPath: String): List<KeyRow> =
+        load(assetPath, fallback = KeyboardLayout.ALPHA_LOWER)
+
     // ── Internal ──────────────────────────────────────────────────────────────
 
     /**

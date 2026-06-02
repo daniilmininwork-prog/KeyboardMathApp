@@ -11,4 +11,8 @@ internal sealed class KeyCode {
     object SwitchToSymbols : KeyCode()
     /** Toggle the optional number row at the top of the alphabetic layer. */
     object ToggleNumberRow : KeyCode()
+    /** Cycle to the next enabled input-method subtype (globe key). */
+    object Globe : KeyCode()
+    /** Activate on-device voice input (T5.2). */
+    object Voice : KeyCode()
 }

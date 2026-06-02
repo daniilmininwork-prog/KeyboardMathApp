@@ -90,4 +90,57 @@ class TallyPreferencesTest {
         prefs.insertExactValue = false
         assertFalse(prefs.insertExactValue)
     }
+
+    // ── formFactorKey (T4.6) ──────────────────────────────────────────────────
+
+    @Test
+    fun formFactorKey_defaultIsNormal() {
+        assertEquals(TallyPreferences.DEFAULT_FORM_FACTOR, prefs.formFactorKey)
+    }
+
+    @Test
+    fun formFactorKey_roundtrip() {
+        prefs.formFactorKey = "ONE_HANDED"
+        assertEquals("ONE_HANDED", prefs.formFactorKey)
+
+        prefs.formFactorKey = "SPLIT"
+        assertEquals("SPLIT", prefs.formFactorKey)
+
+        prefs.formFactorKey = "FLOATING"
+        assertEquals("FLOATING", prefs.formFactorKey)
+
+        prefs.formFactorKey = "NORMAL"
+        assertEquals("NORMAL", prefs.formFactorKey)
+    }
+
+    @Test
+    fun oneHandedRight_defaultIsFalse() {
+        assertFalse(prefs.oneHandedRight)
+    }
+
+    @Test
+    fun oneHandedRight_roundtrip() {
+        prefs.oneHandedRight = true
+        assertTrue(prefs.oneHandedRight)
+        prefs.oneHandedRight = false
+        assertFalse(prefs.oneHandedRight)
+    }
+
+    @Test
+    fun floatingOffsetX_defaultIsZero() {
+        assertEquals(0, prefs.floatingOffsetX)
+    }
+
+    @Test
+    fun floatingOffsetY_defaultIsZero() {
+        assertEquals(0, prefs.floatingOffsetY)
+    }
+
+    @Test
+    fun floatingOffsets_roundtrip() {
+        prefs.floatingOffsetX = 150
+        prefs.floatingOffsetY = 300
+        assertEquals(150, prefs.floatingOffsetX)
+        assertEquals(300, prefs.floatingOffsetY)
+    }
 }

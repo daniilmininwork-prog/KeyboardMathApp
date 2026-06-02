@@ -46,7 +46,7 @@ internal class TallyKeyboardView @JvmOverloads constructor(
     }
 
     // Token provider — resolves colors from the current Context configuration on each access.
-    private val theme = dev.tally.design.KeyTheme(context)
+    internal val theme = dev.tally.design.KeyTheme(context)
 
     // ── Dimensions ────────────────────────────────────────────────────────────
 
