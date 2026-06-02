@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme -->
+    <color name="keyboard_bg">#1C1C1E</color>
+    <color name="key_bg">#2C2C2E</color>
+    <color name="key_bg_pressed">#636366</color>
+    <color name="key_special_bg">#1C1C1E</color>
+    <color name="key_text">#FFFFFF</color>
+    <color name="suggestion_strip_bg">#1C1C1E</color>
+    <color name="suggestion_word_text">#FFFFFF</color>
+    <color name="key_preview_bg">#3A3A3C</color>
+    <!-- Long-press alternate tray -->
+    <color name="long_press_popup_bg">#3A3A3C</color>
+    <color name="long_press_popup_selected_bg">#636366</color>
+</resources>

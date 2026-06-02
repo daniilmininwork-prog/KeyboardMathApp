@@ -1,2 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      android:supportsRtl="true": the keyboard must mirror correctly in RTL locales
+      (Arabic, Hebrew). RTL support has been available since API 17; all supported
+      devices handle it. Required by 05-device-framework-compatibility.md §5.1.
+    -->
+    <application android:supportsRtl="true">
+        <service
+            android:name="dev.tally.ime.TallyInputMethodService"
+            android:label="@string/ime_name"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+    </application>
+</manifest>

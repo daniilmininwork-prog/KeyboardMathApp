@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Key-preview popup bubble: a magnified label centred in a rounded card. -->
+<TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/key_preview_label"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:includeFontPadding="false"
+    android:padding="@dimen/key_preview_padding"
+    android:textColor="@color/key_text"
+    android:textSize="@dimen/key_preview_text_size"
+    android:background="@drawable/key_preview_bg"
+    android:minWidth="@dimen/key_preview_min_width"
+    android:minHeight="@dimen/key_preview_min_height" />

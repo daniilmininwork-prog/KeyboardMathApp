@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="key_row_height">54dp</dimen>
+    <dimen name="suggestion_strip_height">48dp</dimen>
+    <dimen name="key_horizontal_gap">6dp</dimen>
+    <dimen name="key_vertical_gap">8dp</dimen>
+    <dimen name="key_corner_radius">8dp</dimen>
+    <dimen name="key_text_size">18sp</dimen>
+    <dimen name="key_special_text_size">14sp</dimen>
+    <dimen name="key_shadow_radius">2dp</dimen>
+    <dimen name="chip_height">32dp</dimen>
+    <dimen name="chip_horizontal_padding">12dp</dimen>
+    <dimen name="chip_corner_radius">16dp</dimen>
+    <dimen name="chip_text_size">14sp</dimen>
+
+    <!-- Key-preview popup bubble -->
+    <dimen name="key_preview_text_size">26sp</dimen>
+    <dimen name="key_preview_padding">10dp</dimen>
+    <dimen name="key_preview_min_width">48dp</dimen>
+    <dimen name="key_preview_min_height">48dp</dimen>
+    <dimen name="key_preview_corner_radius">10dp</dimen>
+    <!-- Vertical offset: bubble appears this far above the top of the pressed key. -->
+    <dimen name="key_preview_vertical_offset">4dp</dimen>
+
+    <!-- Long-press alternate-key tray -->
+    <dimen name="long_press_popup_corner_radius">10dp</dimen>
+    <!-- Vertical gap between the tray's bottom and the key's top edge. -->
+    <dimen name="long_press_popup_vertical_offset">2dp</dimen>
+</resources>
