@@ -1,18 +1,22 @@
 package dev.tally.math
 
-import java.math.BigDecimal
-import java.text.DecimalFormatSymbols
-import java.util.Locale
-
 internal class Lexer(locale: Locale) {
-    private val symbols = DecimalFormatSymbols.getInstance(locale)
-    private val decimalSep = symbols.decimalSeparator
-    private val groupingSep = symbols.groupingSeparator
+    companion object {
+        // Hard cap: numbers with more significant digits than this are rejected. The scan
+        // window is 256 characters, so a single operand can have at most ~255 digits; this
+        // cap is a belt-and-suspenders defense against pathological input with the window
+        // already providing the outer bound. Chosen conservatively to keep BigDecimal
+        // allocations predictable while allowing any plausible real-world number.
+        internal const val MAX_SIGNIFICANT_DIGITS = 200
+    }
+
+    private val decimalSep = decimalSeparatorFor(locale)
+    private val groupingSep = groupingSeparatorFor(locale)
 
     // Returns -1 if c is not a decimal digit in any script.
     private fun digitValue(c: Char): Int {
-        if (!Character.isDigit(c)) return -1
-        val v = Character.getNumericValue(c)
+        if (!c.isDigit()) return -1
+        val v = c.digitToIntOrNull() ?: return -1
         return if (v in 0..9) v else -1
     }
 
@@ -24,7 +28,7 @@ internal class Lexer(locale: Locale) {
             val c = input[i]
 
             when {
-                c == ' ' || c == '\t' || c == ' ' || c == ' ' -> i++
+                c == ' ' || c == '\t' || c == ' ' || c == ' ' -> i++
 
                 c == '+' -> { tokens += Token.Plus; i++ }
 
@@ -99,7 +103,12 @@ internal class Lexer(locale: Locale) {
         if (digits.isEmpty() || digits.toString() == ".") return null
 
         val raw = digits.toString()
-        val bd = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
+
+        // Significant-digit cap: count digits excluding the leading decimal point.
+        val sigDigits = raw.replace(".", "").length
+        if (sigDigits > MAX_SIGNIFICANT_DIGITS) return null
+
+        val bd = runCatching { bigDecimalOf(raw) }.getOrNull() ?: return null
         val scale = if (hasDecimal) raw.length - raw.indexOf('.') - 1 else 0
         return Pair(Token.Num(bd, scale), i)
     }

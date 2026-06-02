@@ -10,12 +10,19 @@ internal class Parser(private val tokens: List<Token>) {
 
     private class ParseFail : Throwable()
 
-    fun parse(): Expr? = runCatching {
-        if (tokens.isEmpty()) throw ParseFail()
-        val expr = parseExpression()
-        if (pos != tokens.size) throw ParseFail()
-        expr
-    }.getOrNull()
+    fun parse(): Expr? {
+        // Narrow the catch to ParseFail only — a locally-defined sentinel thrown only by this
+        // class's own grammar methods. All other Throwables (IndexOutOfBoundsException, etc.)
+        // propagate so programming errors in the recursive descent remain visible.
+        return try {
+            if (tokens.isEmpty()) throw ParseFail()
+            val expr = parseExpression()
+            if (pos != tokens.size) throw ParseFail()
+            expr
+        } catch (_: ParseFail) {
+            null
+        }
+    }
 
     private fun parseExpression(): Expr {
         var left = parseTerm()

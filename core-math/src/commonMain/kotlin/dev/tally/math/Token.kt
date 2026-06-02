@@ -1,7 +1,5 @@
 package dev.tally.math
 
-import java.math.BigDecimal
-
 internal sealed interface Token {
     data object Plus : Token
     data object Minus : Token
