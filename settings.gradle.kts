@@ -21,8 +21,13 @@ dependencyResolutionManagement {
 
 rootProject.name = "tally"
 include(":core-math")
+include(":keyboard-engine")
+include(":layouts")
+include(":prediction")
+include(":emoji")
 include(":feature-glue")
 include(":ime")
 include(":overlay")
 include(":app")
 include(":design-system")
+include(":build-checks")
