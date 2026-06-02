@@ -26,7 +26,6 @@ class ManifestPermissionGuardTest {
         val forbidden = listOf(
             "android.permission.INTERNET",
             "android.permission.READ_CONTACTS",
-            "android.permission.RECORD_AUDIO",
         )
         forbidden.forEach { perm ->
             assertFalse(
@@ -34,6 +33,24 @@ class ManifestPermissionGuardTest {
                 "Clean manifest should not contain $perm"
             )
         }
+    }
+
+    @Test
+    fun `RECORD_AUDIO is detectable by the guard function`() {
+        // The guard function can detect RECORD_AUDIO, but the Gradle task no longer includes
+        // it in FORBIDDEN_PERMISSIONS because the opt-in voice feature (T5.2) requires it.
+        // This test confirms the detection function still works; the policy decision (allow/
+        // forbid) is enforced separately in the Gradle task's FORBIDDEN_PERMISSIONS set.
+        val manifest = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+                <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            </manifest>
+        """.trimIndent()
+        assertTrue(
+            manifestContainsPermission(manifest, "android.permission.RECORD_AUDIO"),
+            "Guard function must be able to detect RECORD_AUDIO when queried"
+        )
     }
 
     @ParameterizedTest
@@ -44,7 +61,6 @@ class ManifestPermissionGuardTest {
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_SMS",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.READ_EXTERNAL_STORAGE",
