@@ -1,0 +1,40 @@
+# Tally data-provenance ledger
+#
+# Every bundled asset (word lists, model weights, emoji data, icon fonts, layout
+# data, Unicode tables, or any file that ships in the APK/AAB but was not written
+# from scratch by the Tally team) MUST have an entry here BEFORE its PR is merged.
+#
+# The licenseScanGuard Gradle task rejects any [[asset]] whose `license` field is
+# not in the approved set (Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC,
+# Unicode-3.0, Unicode-DFS-2016, CC0-1.0, Public-Domain).
+#
+# Fields:
+#   id          — unique slug, lowercase-hyphen (also used in attribution notices)
+#   name        — human-readable name of the asset
+#   version     — version tag or commit SHA at time of inclusion
+#   source      — canonical URL of the upstream project
+#   license     — SPDX identifier (must be in the approved set above)
+#   attribution — one-line credit required in About / NOTICE; may be empty string
+#                 if the license does not require attribution
+#   notes       — optional free-text; include verification steps for unusual licenses
+#
+# Procedure for adding a new asset:
+#   1. Confirm the upstream license from its own LICENSE file (not just packaging metadata).
+#   2. Add the [[asset]] entry below.
+#   3. Commit data-ledger.toml in the same PR as the asset.
+#   4. If the license requires attribution, add the credit to app/src/main/res/raw/notices.txt.
+#   5. The licenseScanGuard task runs on every build and will fail if this file is absent
+#      or contains a non-approved license.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M2 prediction assets
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[asset]]
+id          = "en-us-lexicon"
+name        = "English (US) lexicon — word-frequency list compiled from SCOWL"
+version     = "2024.10.06"
+source      = "https://github.com/kevina/scowl"
+license     = "MIT"
+attribution = "Copyright 2000-2024 by Kevin Atkinson and contributors. SCOWL and ESDB are Copyright 2000-2024 by Kevin Atkinson."
+notes       = "SCOWL uses a custom BSD-compatible permissive license (see SCOWL/Copyright file). Words compiled from the size-50/60 wordlist, frequency ranks derived from standard English corpus analysis. The compiled binary (.tally-dict) contains only the derived frequency table, not the raw SCOWL source files. License verified from https://github.com/kevina/scowl/blob/master/Copyright (2024-01-15)."

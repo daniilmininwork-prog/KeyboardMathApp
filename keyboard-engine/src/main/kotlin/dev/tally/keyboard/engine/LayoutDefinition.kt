@@ -58,10 +58,16 @@ data class KeyDef(
  * Using negative values avoids collision with any valid Unicode code point.
  */
 object SpecialCode {
-    const val SHIFT     = -1
-    const val DELETE    = -2
-    const val SYMBOLS   = -3
-    const val ENTER     = -4
-    const val SPACE     = -5
-    const val GLOBE     = -6
+    const val SHIFT            = -1
+    const val DELETE           = -2
+    const val SYMBOLS          = -3
+    const val ENTER            = -4
+    const val SPACE            = -5
+    const val GLOBE            = -6
+    /** Switch back to the alphabetic layer from numeric or symbols. */
+    const val ALPHA            = -7
+    /** Switch to the numeric layer from symbols (numeric-layer's "#+=" key returns here). */
+    const val NUMERIC          = -8
+    /** Toggle the optional number row at the top of the alphabetic layer. */
+    const val NUMBER_ROW_TOGGLE = -9
 }
