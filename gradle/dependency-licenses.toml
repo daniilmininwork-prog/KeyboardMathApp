@@ -1,0 +1,53 @@
+# Dependency license registry
+#
+# Format: group:artifact = "SPDX-identifier"
+#
+# Every dependency that appears in any build.gradle.kts must have an entry here.
+# Approved identifiers (per 00 §3.1): Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause,
+# ISC, Unicode-3.0, Unicode-DFS-2016, CC0-1.0, Public-Domain.
+#
+# GPL, LGPL, AGPL, EUPL, CDDL, and any other copyleft identifier are REJECTED.
+# "license-scan flags a planted GPL dep" — the guard rejects any entry not in the
+# approved set, so adding a GPL entry here will fail the build immediately.
+#
+# Procedure for adding a new dependency:
+#   1. Verify the license from the project's own LICENSE file or SPDX metadata.
+#   2. Add the entry below in alphabetical order by group:artifact.
+#   3. Commit dependency-licenses.toml in the same PR as the dependency addition.
+#   4. The licenseScanGuard Gradle task enforces this at every build.
+
+# ── Android Gradle Plugin ─────────────────────────────────────────────────────
+com.android.tools.build:gradle = "Apache-2.0"
+
+# ── AndroidX ─────────────────────────────────────────────────────────────────
+androidx.appcompat:appcompat = "Apache-2.0"
+androidx.core:core-ktx = "Apache-2.0"
+androidx.preference:preference-ktx = "Apache-2.0"
+androidx.test:core-ktx = "Apache-2.0"
+androidx.test:runner = "Apache-2.0"
+androidx.test.ext:junit = "Apache-2.0"
+
+# ── Google Material ───────────────────────────────────────────────────────────
+com.google.android.material:material = "Apache-2.0"
+
+# ── JUnit 4 ──────────────────────────────────────────────────────────────────
+junit:junit = "Apache-2.0"
+
+# ── JUnit 5 / Jupiter ────────────────────────────────────────────────────────
+org.junit.jupiter:junit-jupiter-api = "Apache-2.0"
+org.junit.jupiter:junit-jupiter-engine = "Apache-2.0"
+org.junit.jupiter:junit-jupiter-params = "Apache-2.0"
+
+# ── Kotest ────────────────────────────────────────────────────────────────────
+io.kotest:kotest-assertions-core = "Apache-2.0"
+io.kotest:kotest-property = "Apache-2.0"
+io.kotest:kotest-runner-junit5 = "Apache-2.0"
+
+# ── Kotlin runtime ───────────────────────────────────────────────────────────
+org.jetbrains.kotlin:kotlin-stdlib = "Apache-2.0"
+
+# ── CycloneDX SBOM plugin ────────────────────────────────────────────────────
+org.cyclonedx:cyclonedx-gradle-plugin = "Apache-2.0"
+
+# ── Robolectric ──────────────────────────────────────────────────────────────
+org.robolectric:robolectric = "Apache-2.0"
