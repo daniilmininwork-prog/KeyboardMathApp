@@ -1,2 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+          TallyOverlayService reads only the text field the user is actively typing in
+          to find arithmetic expressions. It never traverses unrelated UI, logs, stores,
+          or transmits text.
+
+          BIND_ACCESSIBILITY_SERVICE: protects this service so only the system can bind to
+          it. The user must explicitly enable it in Accessibility settings — it is never
+          enabled programmatically by the app.
+        -->
+        <service
+            android:name="dev.tally.overlay.TallyOverlayService"
+            android:exported="true"
+            android:label="@string/overlay_a11y_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/overlay_accessibility_service" />
+        </service>
+
+        <activity
+            android:name="dev.tally.overlay.OverlayConsentActivity"
+            android:exported="false"
+            android:label="@string/overlay_consent_title" />
+
+    </application>
+
+</manifest>

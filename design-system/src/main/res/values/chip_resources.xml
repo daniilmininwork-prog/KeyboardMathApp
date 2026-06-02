@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chip colours (light) -->
+    <color name="ds_chip_bg">#FFFFFF</color>
+    <color name="ds_chip_text">#1C1C1E</color>
+
+    <!-- Motion durations (ms) — also consumed by MotionToken -->
+    <integer name="ds_motion_appear_ms">140</integer>
+    <integer name="ds_motion_fade_ms">80</integer>
+    <integer name="ds_motion_dismiss_ms">100</integer>
+
+    <!-- Chip geometry defaults -->
+    <dimen name="ds_chip_corner_radius">16dp</dimen>
+    <dimen name="ds_chip_h_padding">12dp</dimen>
+    <dimen name="ds_chip_visual_height">32dp</dimen>
+    <dimen name="ds_chip_text_size">14sp</dimen>
+
+    <!-- Accessibility strings -->
+    <string name="ds_chip_action_insert">Insert result</string>
+    <string name="ds_chip_description">Insert result %s</string>
+</resources>

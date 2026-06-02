@@ -15,5 +15,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":core-math"))
+    // api so that Suggestion (part of MathEvaluator's public callback type) is visible
+    // to modules that depend on feature-glue (e.g. ime).
+    api(project(":core-math"))
 }

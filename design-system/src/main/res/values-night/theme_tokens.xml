@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme color tokens (consumed by KeyTheme) -->
+    <color name="ds_keyboard_bg">#1C1C1E</color>
+    <color name="ds_key_bg">#2C2C2E</color>
+    <color name="ds_key_special_bg">#1C1C1E</color>
+    <color name="ds_key_pressed_bg">#636366</color>
+    <color name="ds_key_text">#FFFFFF</color>
+    <color name="ds_suggestion_strip_bg">#1C1C1E</color>
+    <color name="ds_key_preview_bg">#3A3A3C</color>
+    <color name="ds_long_press_popup_bg">#3A3A3C</color>
+    <color name="ds_long_press_popup_selected_bg">#636366</color>
+</resources>

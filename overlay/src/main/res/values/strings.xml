@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="overlay_a11y_service_label">Tally Math Overlay</string>
+    <!-- Shown in the system Accessibility settings list. Must explain what the service does
+         without sounding like spyware. -->
+    <string name="overlay_a11y_service_description">Shows arithmetic results above the keyboard as you type. Reads only the text field you\'re actively typing in — never logs, stores, or transmits your text.</string>
+
+    <string name="overlay_consent_title">Enable overlay mode</string>
+    <string name="overlay_consent_body">Overlay mode shows a math result chip above any keyboard — so you can keep Gboard, Samsung Keyboard, or whichever keyboard you use.</string>
+
+    <string name="overlay_permission_a11y_label">Accessibility permission</string>
+    <string name="overlay_permission_a11y_reason">Reads the text field you\'re actively typing in to detect arithmetic expressions — Tally never logs, stores, or sends your text anywhere.</string>
+
+    <string name="overlay_btn_open_a11y_settings">Open accessibility settings</string>
+    <string name="overlay_btn_done">Done</string>
+
+    <string name="overlay_status_enabled">Overlay mode is active.</string>
+    <string name="overlay_status_disabled">Not yet enabled — tap above, then turn on \"Tally Math Overlay\".</string>
+</resources>
