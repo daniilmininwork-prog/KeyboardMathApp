@@ -25,8 +25,8 @@ class VetoesTest {
         val original = "abc12+3="
         // span covers "12+3=" at indices 3..8
         assertTrue(
-            "Letter before span must trigger identifier-adjacent veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 3, spanEnd = 8),
+            "Letter before span must trigger identifier-adjacent veto",
         )
     }
 
@@ -35,8 +35,8 @@ class VetoesTest {
         // Span starts at position 0 — there is no character before it.
         val original = "2+3="
         assertFalse(
-            "Span at position 0 has no preceding character; must NOT trigger veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 0, spanEnd = 4),
+            "Span at position 0 has no preceding character; must NOT trigger veto",
         )
     }
 
@@ -48,8 +48,8 @@ class VetoesTest {
         val original = "2+3=abc"
         // span covers "2+3=" at indices 0..4
         assertTrue(
-            "Letter after span must trigger identifier-adjacent veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 0, spanEnd = 4),
+            "Letter after span must trigger identifier-adjacent veto",
         )
     }
 
@@ -58,8 +58,8 @@ class VetoesTest {
         val original = "2+3="
         // Span covers the whole string; spanEnd == original.length → no char after.
         assertFalse(
-            "Span at end has no following character; must NOT trigger veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 0, spanEnd = original.length),
+            "Span at end has no following character; must NOT trigger veto",
         )
     }
 
@@ -70,8 +70,8 @@ class VetoesTest {
         // " 2+3=" — space before is not a letter
         val original = " 2+3="
         assertFalse(
-            "Space before span is not a letter; must NOT trigger veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 1, spanEnd = 5),
+            "Space before span is not a letter; must NOT trigger veto",
         )
     }
 
@@ -80,8 +80,8 @@ class VetoesTest {
         // "2+3= hello" — space after span
         val original = "2+3= hello"
         assertFalse(
-            "Space after span is not a letter; must NOT trigger veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 0, spanEnd = 4),
+            "Space after span is not a letter; must NOT trigger veto",
         )
     }
 
@@ -90,8 +90,8 @@ class VetoesTest {
         // "1[2+3=]4" — digits on both sides are not letters
         val original = "12+3=4"
         assertFalse(
-            "Digits on both sides are not letters; must NOT trigger veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 1, spanEnd = 5),
+            "Digits on both sides are not letters; must NOT trigger veto",
         )
     }
 
@@ -102,8 +102,8 @@ class VetoesTest {
         // "a2+3=b" — letter on both sides
         val original = "a2+3=b"
         assertTrue(
-            "Letters on both sides must trigger identifier-adjacent veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 1, spanEnd = 5),
+            "Letters on both sides must trigger identifier-adjacent veto",
         )
     }
 
@@ -113,8 +113,8 @@ class VetoesTest {
     fun `span covers entire string — returns false`() {
         val original = "2+3="
         assertFalse(
-            "Span covering entire string has no neighbours; must NOT trigger veto",
             Vetoes.isIdentifierAdjacent(original, spanStart = 0, spanEnd = original.length),
+            "Span covering entire string has no neighbours; must NOT trigger veto",
         )
     }
 }

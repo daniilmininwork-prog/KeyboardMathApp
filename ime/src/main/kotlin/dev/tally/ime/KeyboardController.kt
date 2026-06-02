@@ -121,7 +121,7 @@ internal class KeyboardController {
             keyboardState = resolveKeyboardState()
             composing.resetWithoutIc()
         }
-        mirror.seed(ic, editorPackageName = currentEditorInfo.packageName)
+        mirror.seed(ic, editorPackageName = info.packageName)
     }
 
     /**

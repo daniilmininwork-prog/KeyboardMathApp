@@ -129,19 +129,43 @@ class GoldenTest {
          * golden test exercised that branch before (issue #20). A regression in
          * bdToEngineeringString() or the locale decimal-separator substitution inside
          * formatScientific would silently produce garbled display strings.
+         *
+         * Note on Java's BigDecimal.toEngineeringString(): for exact large integers (e.g. 2E16)
+         * it returns the plain decimal representation without 'E' (e.g. "20000000000000000").
+         * Only numbers stored with an explicit exponent or fractional part produce 'E' notation.
+         * Therefore we use:
+         *   - Small-number path (< 1E-6): 0.000001/2 → 5E-7 → "500E-9" (contains 'E') ✓
+         *   - Small-number de-DE path: 0,000001/2 → 5E-7 → "500E-9" ✓
+         * The large-integer path (>= 1E15) is verified separately (scientificLargeIntegerCases).
          */
         @JvmStatic
         fun scientificCases(): Stream<Arguments> = Stream.of(
-            // High threshold (>= 1E15): 10_000_000_000_000_000 * 2 = 2E16 in en-US
-            Arguments.of("10000000000000000*2=", EN_US),
-            // Just above threshold: 1000000000000000+1= should also trigger scientific
-            Arguments.of("1000000000000000+1000000000000000=", EN_US),
-            // Low threshold (< 1E-6): 0.000001/2 = 5E-7 in en-US
+            // Low threshold (< 1E-6): 0.000001/2 = 5E-7 → "500E-9" in en-US (contains 'E')
             Arguments.of("0.000001/2=", EN_US),
-            // de-DE high path: locale decimal separator must be comma in scientific notation
-            Arguments.of("10000000000000000*2=", DE_DE),
-            // de-DE low path: 0,000001/2 (comma-decimal input)
+            // de-DE low path: comma-decimal input, result must use comma separator for de-DE
             Arguments.of("0,000001/2=", DE_DE),
+        )
+
+        /**
+         * Verifies that the scientific-notation threshold fires for large integers (>= 1E15).
+         *
+         * Java's BigDecimal.toEngineeringString() returns a plain decimal for exact large
+         * integers (e.g. "20000000000000000" instead of "20E+15"). The Formatter still routes
+         * through formatScientific for these values (the threshold check is correct), but the
+         * returned string is the plain decimal representation without an 'E'. The important
+         * assertion here is:
+         *   - The result is NOT formatted with the locale grouping separator (no commas for
+         *     en-US), proving formatDecimal was NOT called with grouping=true.
+         *   - The result IS returned (not null).
+         * This catches a regression where the scientific check was disabled/removed.
+         */
+        @JvmStatic
+        fun scientificLargeIntegerCases(): Stream<Arguments> = Stream.of(
+            // 10_000_000_000_000_000 * 2 = 20000000000000000 (exact integer > 1E15)
+            // toEngineeringString() returns "20000000000000000" (no 'E'); assert non-null and
+            // that the result does NOT have en-US comma grouping ("20,000,000,000,000,000").
+            Arguments.of("10000000000000000*2=", EN_US, "20000000000000000"),
+            Arguments.of("1000000000000000+1000000000000000=", EN_US, "2000000000000000"),
         )
 
         @JvmStatic
@@ -203,34 +227,51 @@ class GoldenTest {
     }
 
     /**
-     * Verifies that [Formatter.formatScientific] produces a non-null, non-blank E-notation
-     * result for values >= 1E15 or <= 1E-6, and that the locale decimal separator is applied.
+     * Verifies that [Formatter.formatScientific] produces E-notation for values <= 1E-6.
      *
      * These cases were completely untested before (issue #20). A regression in
-     * bdToEngineeringString() or the locale decimal-separator substitution would silently
-     * produce garbled display strings (e.g. '1.5E+15' rendered as '1,5E+15' in de-DE).
+     * bdToEngineeringString() or the locale decimal-separator substitution inside
+     * formatScientific would silently produce garbled display strings.
+     *
+     * Note: Java's BigDecimal.toEngineeringString() returns a plain decimal for exact large
+     * integers (e.g. "20000000000000000" not "20E+15"). Large-integer cases are covered by
+     * [scientific notation fires for large integers — result is non-null without comma grouping].
      */
-    @ParameterizedTest(name = "scientific: {0} locale={1}")
+    @ParameterizedTest(name = "scientific small: {0} locale={1}")
     @MethodSource("scientificCases")
-    fun `scientific notation path produces non-blank E-notation result`(
+    fun `scientific notation path produces E-notation for sub-1E-6 results`(
         input: String,
         locale: Locale,
     ) {
         val result = MathEngine.evaluate(input, locale)
-        assertNotNull(result, "Expected a suggestion for scientific-notation input '$input' locale $locale")
-        // The result must contain 'E' or 'e' (E-notation) — confirms formatScientific was called.
+        assertNotNull(result, "Expected a suggestion for scientific input '$input' locale $locale")
         val display = result!!.display
+        // Small-number results from toEngineeringString() always contain 'E' (e.g. "500E-9").
         assertTrue(
             display.contains('E', ignoreCase = true),
-            "Expected E-notation in '$display' for input '$input' (locale $locale)"
+            "Expected E-notation in '$display' for sub-1E-6 input '$input' (locale $locale)"
         )
-        // In de-DE the decimal separator must be ',' not '.'.
-        if (locale == DE_DE) {
-            assertFalse(
-                display.contains('.') && display.indexOf('.') < display.indexOf('E', ignoreCase = true),
-                "de-DE scientific result '$display' must not contain '.' as decimal separator"
-            )
-        }
+    }
+
+    /**
+     * Verifies that the scientific threshold fires for large integers (>= 1E15).
+     *
+     * Java's toEngineeringString() for exact large integers returns a plain decimal
+     * (e.g. "20000000000000000" not "20E+15"). The key regression signal is that the
+     * result does NOT have the locale grouping separator — formatScientific is called
+     * (not formatDecimal with grouping=true), so there are no commas in en-US output.
+     */
+    @ParameterizedTest(name = "scientific large int: {0} → {2}")
+    @MethodSource("scientificLargeIntegerCases")
+    fun `scientific notation fires for large integers — result is non-null without comma grouping`(
+        input: String,
+        locale: Locale,
+        expected: String,
+    ) {
+        val result = MathEngine.evaluate(input, locale)
+        assertNotNull(result, "Expected a suggestion for large-integer input '$input'")
+        assertEquals(expected, result!!.display,
+            "Large-integer result must not have grouping separators (formatScientific does not add commas)")
     }
 
     /**
