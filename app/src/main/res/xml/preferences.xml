@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        app:key="enabled"
+        app:title="@string/pref_enabled_title"
+        app:summary="@string/pref_enabled_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="precision"
+        app:title="@string/pref_precision_title"
+        app:summary="%s"
+        app:entries="@array/pref_precision_entries"
+        app:entryValues="@array/pref_precision_values"
+        app:defaultValue="-1"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="percent_mode"
+        app:title="@string/pref_percent_mode_title"
+        app:summary="%s"
+        app:entries="@array/pref_percent_mode_entries"
+        app:entryValues="@array/pref_percent_mode_values"
+        app:defaultValue="ADDITIVE"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="replace_expression"
+        app:title="@string/pref_replace_title"
+        app:summary="@string/pref_replace_summary"
+        app:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="haptics"
+        app:title="@string/pref_haptics_title"
+        app:summary="@string/pref_haptics_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="sound"
+        app:title="@string/pref_sound_title"
+        app:summary="@string/pref_sound_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="number_row_enabled"
+        app:title="@string/pref_number_row_title"
+        app:summary="@string/pref_number_row_summary"
+        app:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="insert_exact_value"
+        app:title="@string/pref_insert_exact_title"
+        app:summary="@string/pref_insert_exact_summary"
+        app:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <EditTextPreference
+        app:key="locale_override"
+        app:title="@string/pref_locale_title"
+        app:summary="@string/pref_locale_summary"
+        app:defaultValue=""
+        app:iconSpaceReserved="false" />
+
+    <Preference
+        app:key="overlay"
+        app:title="@string/pref_overlay_title"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

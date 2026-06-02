@@ -1,0 +1,29 @@
+Tally Keyboard — Third-Party Notices
+=====================================
+
+This application includes compiled data derived from the following third-party sources.
+Full license texts are available at the URLs listed below.
+
+─────────────────────────────────────────────────────────────────────────────
+SCOWL (Spell Checker Oriented Word Lists) and ESDB
+─────────────────────────────────────────────────────────────────────────────
+The English prediction lexicon (en_us.tally-dict) is compiled from word lists
+derived from SCOWL and the English Spell-Check Database (ESDB).
+
+Copyright (C) 2000-2024 by Kevin Atkinson and contributors.
+Source: https://github.com/kevina/scowl
+
+SCOWL License (BSD-compatible permissive; no copyleft):
+
+  Copyright 2000-2024 by Kevin Atkinson
+
+  Permission to use, copy, modify, distribute and sell these word
+  lists, the associated scripts, the output created from the scripts,
+  and its documentation for any purpose is hereby granted without fee,
+  provided that the above copyright notice appears in all copies and
+  that both that copyright notice and this permission notice appear in
+  supporting documentation. Kevin Atkinson makes no representations
+  about the suitability of this software for any purpose. It is
+  provided "as is" without express or implied warranty.
+
+─────────────────────────────────────────────────────────────────────────────

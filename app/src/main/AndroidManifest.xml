@@ -1,7 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      android:allowBackup="false": keyboard state (learned words, preferences) must never
+      be sent to Google cloud backup. A restored dictionary from another device or user is
+      a privacy defect — the only safe policy is no cloud backup at all.
+      android:dataExtractionRules: Android 12+ full-backup exclusion (redundant with
+      allowBackup=false but belt-and-suspenders since AGP may still merge library rules).
+      android:fullBackupContent: pre-12 equivalent.
+    -->
+    <!--
+      android:supportsRtl="true": required by 05-device-framework-compatibility.md §5.1.
+      Use start/end (not left/right) everywhere in layouts; RTL mirroring has been
+      available since API 17 so every supported device handles it natively.
+    -->
     <application
-        android:label="Tally"
-        android:theme="@style/Theme.AppCompat">
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Tally"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:supportsRtl="true">
+        <activity
+            android:name="dev.tally.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="dev.tally.OnboardingActivity"
+            android:exported="false"
+            android:label="@string/app_name" />
+        <activity
+            android:name="dev.tally.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings"
+            android:parentActivityName="dev.tally.MainActivity" />
+        <activity
+            android:name="dev.tally.AboutActivity"
+            android:exported="false"
+            android:label="@string/about"
+            android:parentActivityName="dev.tally.MainActivity" />
     </application>
 </manifest>

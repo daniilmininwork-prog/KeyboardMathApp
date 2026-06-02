@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tally</string>
+    <string name="enable_keyboard_prompt">To use Tally, enable it in\nSettings → General Management → Keyboard → On-screen keyboard</string>
+    <string name="select_keyboard_prompt">Then tap "Current keyboard" and choose Tally.</string>
+    <string name="settings">Settings</string>
+
+    <!-- Settings screen -->
+    <string name="pref_enabled_title">Enable math suggestions</string>
+    <string name="pref_enabled_summary">Show arithmetic results in the suggestion strip</string>
+    <string name="pref_precision_title">Display precision</string>
+    <string name="pref_percent_mode_title">Percent mode</string>
+    <string name="pref_replace_title">Replace expression on insert</string>
+    <string name="pref_replace_summary">Replace 2+2= with 4 instead of appending it</string>
+    <string name="pref_haptics_title">Haptic feedback</string>
+    <string name="pref_haptics_summary">Subtle tap when inserting a result</string>
+    <string name="pref_sound_title">Key sounds</string>
+    <string name="pref_sound_summary">Play a click sound on each keypress</string>
+    <string name="pref_number_row_title">Number row</string>
+    <string name="pref_number_row_summary">Show a dedicated number row above the letter keys</string>
+    <string name="pref_insert_exact_title">Insert exact value</string>
+    <string name="pref_insert_exact_summary">Replace the expression with the full-precision decimal instead of the formatted result</string>
+    <string name="pref_locale_title">Locale override</string>
+    <string name="pref_locale_summary">Leave blank to follow the system locale (e.g. "de-DE")</string>
+
+    <!-- Precision list entries -->
+    <string-array name="pref_precision_entries">
+        <item>Automatic</item>
+        <item>0 decimal places</item>
+        <item>1 decimal place</item>
+        <item>2 decimal places</item>
+        <item>3 decimal places</item>
+        <item>4 decimal places</item>
+    </string-array>
+    <string-array name="pref_precision_values">
+        <item>-1</item>
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+
+    <!-- Onboarding — step 1: enable -->
+    <string name="onboarding_step1_progress">Step 1 of 3</string>
+    <string name="onboarding_step1_title">Enable Tally</string>
+    <string name="onboarding_step1_body">Add Tally to your enabled keyboards. Tap the button below and look for "Tally" in the list, then switch it on.</string>
+    <string name="onboarding_step1_btn">Open keyboard settings</string>
+    <string name="onboarding_step1_hint">Return here once you\'ve enabled Tally — we\'ll detect it automatically.</string>
+
+    <!-- Onboarding — step 2: select -->
+    <string name="onboarding_step2_progress">Step 2 of 3</string>
+    <string name="onboarding_step2_title">Choose Tally</string>
+    <string name="onboarding_step2_body">Select Tally as your active keyboard from the picker.</string>
+    <string name="onboarding_step2_btn">Open keyboard picker</string>
+    <string name="onboarding_step2_hint">Return here once you\'ve selected Tally.</string>
+
+    <!-- Onboarding — step 3: try it -->
+    <string name="onboarding_step3_title">You\'re all set!</string>
+    <string name="onboarding_step3_body">Tally shows arithmetic results as you type. Try it below — the chip shows the answer; tap it to insert.</string>
+    <string name="onboarding_try_it_label">Try it</string>
+    <string name="onboarding_try_it_hint">Type a math expression ending with =</string>
+    <string name="onboarding_done_btn">Done</string>
+
+    <!-- About / privacy -->
+    <string name="about">About</string>
+    <string name="about_privacy_title">On-device, no network</string>
+    <string name="about_privacy_body">Every calculation happens entirely on your device. Tally has no internet permission and cannot make network requests — nothing you type ever leaves your phone.\n\nThe keyboard reads what you type only to find arithmetic expressions. It does not log, store, or transmit your text.</string>
+    <string name="about_permissions_title">Permissions</string>
+    <string name="about_permissions_body">BIND_INPUT_METHOD — required by Android for all third-party keyboards. It lets the system connect to Tally when you select it as your active keyboard.\n\nNo other permissions are requested or used.</string>
+    <string name="about_version_label">Version</string>
+
+    <!-- MainActivity — home screen -->
+    <string name="main_status_active">Tally keyboard is active</string>
+    <string name="main_status_inactive">Tally keyboard is not set up</string>
+    <string name="main_status_active_sub">Start typing math in any app to see results appear in the keyboard suggestion bar.</string>
+    <string name="main_status_inactive_sub">Finish setting up Tally to get started.</string>
+    <string name="main_btn_setup">Set up Tally</string>
+    <string name="main_btn_try_again">Try it again</string>
+
+    <!-- Overlay mode settings entry -->
+    <string name="pref_overlay_title">Overlay mode</string>
+    <string name="pref_overlay_summary_enabled">Active — works above any keyboard</string>
+    <string name="pref_overlay_summary_disabled">Tap to set up — works alongside any keyboard</string>
+
+    <!-- Percent mode list entries -->
+    <string-array name="pref_percent_mode_entries">
+        <item>Additive (100+20% = 120)</item>
+        <item>Direct (100+20% = 100.2)</item>
+    </string-array>
+    <string-array name="pref_percent_mode_values">
+        <item>ADDITIVE</item>
+        <item>DIRECT</item>
+    </string-array>
+</resources>

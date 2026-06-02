@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme — Material3 day/night with dynamic colour on API 31+.
+         Falls back to the static teal/indigo palette on older devices. -->
+    <style name="Theme.Tally" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/tally_primary</item>
+        <item name="colorOnPrimary">@color/tally_on_primary</item>
+        <item name="colorSurface">@color/tally_surface</item>
+    </style>
+</resources>
