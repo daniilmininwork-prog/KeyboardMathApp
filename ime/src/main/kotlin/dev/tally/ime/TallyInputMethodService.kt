@@ -430,36 +430,25 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         super.onComputeInsets(outInsets)
         outInsets ?: return
 
-        val stripHeight = resources.getDimensionPixelSize(R.dimen.suggestion_strip_height)
-
-        // Use the transform cached by the last onMeasure pass. If the key plane has not yet
-        // been measured (e.g., first call before layout), fall back to the height policy.
         val transform = keyPlane?.lastTransform
-
         if (transform != null && !transform.claimsInsets) {
             // FLOATING mode: the keyboard overlays content and must not push the host upward.
-            // Report zero insets so the focused field stays visible behind the floating panel.
+            // contentTopInsets = 0 lets the focused field stay visible behind the floating panel;
+            // with that origin TOUCHABLE_INSETS_CONTENT keeps the whole window (and thus the
+            // floating panel) touchable.
             outInsets.contentTopInsets = 0
             outInsets.visibleTopInsets = 0
             outInsets.touchableInsets  = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT
             return
         }
 
-        val keyPlaneHeight = transform?.heightPx ?: run {
-            val dm = resources.displayMetrics
-            val rowCount = (keyPlane?.currentRows?.size ?: DEFAULT_ROW_COUNT).coerceAtLeast(1)
-            KeyboardHeightPolicy.heightPx(
-                screenWidthPx  = dm.widthPixels,
-                screenHeightPx = dm.heightPixels,
-                density        = dm.density,
-                rowCount       = rowCount,
-            )
-        }
-        val totalHeight = keyPlaneHeight + stripHeight
-
-        outInsets.contentTopInsets = totalHeight
-        outInsets.visibleTopInsets = totalHeight
-        outInsets.touchableInsets  = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT
+        // Anchored modes (normal / one-handed / split): the framework default computed by
+        // super.onComputeInsets already reports the input view's height as the content inset and
+        // marks the visible keyboard as the touchable region (TOUCHABLE_INSETS_VISIBLE). The
+        // earlier override forced TOUCHABLE_INSETS_CONTENT with contentTopInsets = the full
+        // keyboard height, which declared the entire keyboard NON-touchable — so every tap fell
+        // through to the app behind it (the keyboard rendered but registered no presses). Trust
+        // super here rather than recomputing.
     }
 
     /**
