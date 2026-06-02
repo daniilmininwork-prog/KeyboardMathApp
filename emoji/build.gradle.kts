@@ -19,6 +19,13 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    // EmojiCompat: ensures emoji glyphs render correctly on Android 4.4–11
+    // where the system font may lack recent emoji codepoints. On Android 12+
+    // the platform handles emoji natively; emoji2 degrades gracefully.
+    implementation(libs.androidx.emoji2)
+    implementation(libs.androidx.emoji2.views)
+    implementation(libs.androidx.emoji2.views.helper)
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)

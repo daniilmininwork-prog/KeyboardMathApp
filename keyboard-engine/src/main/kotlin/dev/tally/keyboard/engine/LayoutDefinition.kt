@@ -70,4 +70,6 @@ object SpecialCode {
     const val NUMERIC          = -8
     /** Toggle the optional number row at the top of the alphabetic layer. */
     const val NUMBER_ROW_TOGGLE = -9
+    /** Activate on-device voice input (T5.2). */
+    const val VOICE            = -10
 }

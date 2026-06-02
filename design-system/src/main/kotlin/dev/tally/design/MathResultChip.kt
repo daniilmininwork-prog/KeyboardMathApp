@@ -62,6 +62,14 @@ class MathResultChip @JvmOverloads constructor(
     // Token provider — resolves colors from the current Context configuration on each access.
     private val theme = KeyTheme(context)
 
+    /**
+     * Returns the [KeyTheme] used by this chip.
+     *
+     * Callers (typically the IME) may register this theme with [TallyThemeManager] so that
+     * dynamic color changes are reflected without a view recreate.
+     */
+    fun keyTheme(): KeyTheme = theme
+
     init {
         isFocusable = true
         isClickable = false

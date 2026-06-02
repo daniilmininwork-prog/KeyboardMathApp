@@ -38,7 +38,7 @@ import dev.tally.keyboard.engine.SpecialCode
  * ```
  *
  * Special key codes are expressed as strings: "SHIFT", "DELETE", "SYMBOLS",
- * "ENTER", "SPACE", "GLOBE". The parser maps these to [SpecialCode] sentinels.
+ * "ENTER", "SPACE", "GLOBE", "VOICE". The parser maps these to [SpecialCode] sentinels.
  */
 object LayoutParser {
 
@@ -160,6 +160,7 @@ object LayoutParser {
             "ALPHA"            -> SpecialCode.ALPHA
             "NUMERIC"          -> SpecialCode.NUMERIC
             "NUMBER_ROW_TOGGLE" -> SpecialCode.NUMBER_ROW_TOGGLE
+            "VOICE"             -> SpecialCode.VOICE
             else               -> throw LayoutParseException("$location unknown special code '$name'")
         }
 

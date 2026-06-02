@@ -38,3 +38,16 @@ source      = "https://github.com/kevina/scowl"
 license     = "MIT"
 attribution = "Copyright 2000-2024 by Kevin Atkinson and contributors. SCOWL and ESDB are Copyright 2000-2024 by Kevin Atkinson."
 notes       = "SCOWL uses a custom BSD-compatible permissive license (see SCOWL/Copyright file). Words compiled from the size-50/60 wordlist, frequency ranks derived from standard English corpus analysis. The compiled binary (.tally-dict) contains only the derived frequency table, not the raw SCOWL source files. License verified from https://github.com/kevina/scowl/blob/master/Copyright (2024-01-15)."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M4 emoji assets
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[asset]]
+id          = "emoji-cldr-annotations"
+name        = "Unicode CLDR emoji annotations — emoji names and keyword annotations"
+version     = "45.0"
+source      = "https://github.com/unicode-org/cldr"
+license     = "Unicode-3.0"
+attribution = "Unicode CLDR Project. Copyright © 1991-2024 Unicode, Inc. All rights reserved."
+notes       = "Emoji names and keyword strings are derived from Unicode CLDR cldr-common annotations (en/annotations/en.xml). The Unicode License V3 (Unicode-3.0) is explicitly commercial and closed-source OK with attribution. License verified from https://github.com/unicode-org/cldr/blob/main/unicode-license.txt (2024-01-15). The bundled emoji_data.json was compiled from this source; only name and keyword data is included, no executable code. Emoji character sequences themselves are uncopyrightable fact."

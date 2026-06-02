@@ -47,7 +47,8 @@
       "keys": [
         { "code": "SYMBOLS", "label": "?123", "width": 0.15, "isSpecial": true },
         { "code": "GLOBE",   "label": "🌐",   "width": 0.1,  "isSpecial": true },
-        { "code": "SPACE",   "label": " ",    "width": 0.5,  "isSpecial": true },
+        { "code": "VOICE",   "label": "🎤",   "width": 0.1,  "isSpecial": true },
+        { "code": "SPACE",   "label": " ",    "width": 0.4,  "isSpecial": true },
         { "code": 46, "label": ".", "moreKeys": [",", "!", "?", ";", ":", "…"], "width": 0.1 },
         { "code": "ENTER",   "label": "↵",   "width": 0.15, "isSpecial": true }
       ]

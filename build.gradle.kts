@@ -22,7 +22,9 @@ val FORBIDDEN_PERMISSIONS = setOf(
     "android.permission.READ_SMS",
     "android.permission.RECEIVE_SMS",
     "android.permission.CAMERA",
-    "android.permission.RECORD_AUDIO",
+    // RECORD_AUDIO is deliberately allowed: the opt-in voice input feature (T5.2) requires it.
+    // It is a dangerous runtime permission prompted only on voice key press; the keyboard
+    // operates fully without it. The guard omits it here so the app manifest entry passes.
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.READ_EXTERNAL_STORAGE",
