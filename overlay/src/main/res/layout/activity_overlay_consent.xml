@@ -23,6 +23,14 @@
             android:text="@string/overlay_consent_body" />
 
         <TextView
+            android:id="@+id/overlay_limitation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/overlay_limitation_commit_only"
+            android:textColor="?android:attr/textColorSecondary" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"

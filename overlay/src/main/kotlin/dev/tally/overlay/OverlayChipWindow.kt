@@ -3,9 +3,11 @@ package dev.tally.overlay
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.os.Build
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
 import dev.tally.design.MathResultChip
@@ -46,12 +48,32 @@ internal class OverlayChipWindow(private val context: Context) {
     private var isAttached = false
 
     /**
-     * Shows the chip with [text] positioned just above [fieldBounds].
+     * Shows the chip with [text] anchored relative to [fieldBounds], clamped to the visible
+     * content band so it never overlaps the status bar / notch or the keyboard. If no fully
+     * visible position exists the chip is suppressed (AC-5) rather than shown un-tappable.
      *
      * Safe to call when the chip is already visible — updates text and repositions.
      */
     fun show(text: String, fieldBounds: Rect) {
-        val params = buildWindowParams(fieldBounds)
+        val chipH = dpToPx(CHIP_HEIGHT_DP).toInt()
+        val margin = dpToPx(CHIP_MARGIN_DP).toInt()
+        val band = resolveContentBand()
+        val placement = OverlayPlacement.compute(
+            fieldTop = fieldBounds.top,
+            fieldBottom = fieldBounds.bottom,
+            contentTop = band.top,
+            contentBottom = band.bottom,
+            chipHeight = chipH,
+            margin = margin,
+        )
+        if (placement is OverlayPlacement.Placement.Suppress) {
+            // Keyboard would occlude the chip, or there is no room outside the system bars.
+            dismiss()
+            return
+        }
+        val y = (placement as OverlayPlacement.Placement.Show).y
+
+        val params = buildWindowParams(y)
         chip.show(text)
         if (isAttached) {
             try {
@@ -121,13 +143,8 @@ internal class OverlayChipWindow(private val context: Context) {
     /** Dismisses and releases resources. Call from [TallyOverlayService.onDestroy]. */
     fun destroy() = dismiss()
 
-    private fun buildWindowParams(fieldBounds: Rect): WindowManager.LayoutParams {
-        val chipH = dpToPx(CHIP_HEIGHT_DP).toInt()
-        val margin = dpToPx(CHIP_MARGIN_DP).toInt()
-        // Position chip so its bottom edge sits CHIP_MARGIN_DP above the field's top.
-        val y = (fieldBounds.top - chipH - margin).coerceAtLeast(margin)
-
-        return WindowManager.LayoutParams(
+    private fun buildWindowParams(y: Int): WindowManager.LayoutParams =
+        WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -139,7 +156,38 @@ internal class OverlayChipWindow(private val context: Context) {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             this.y = y
         }
+
+    /**
+     * Resolves the vertical band the chip may occupy: from the bottom of the status bar / display
+     * cutout down to the top of the keyboard (or navigation bar). `FLAG_LAYOUT_IN_SCREEN` is not
+     * inset-aware, so the system bars are accounted for explicitly (`02 §4.5`).
+     *
+     * On API 30+ the values come from the live `WindowInsets`; below that the IME inset is not
+     * observable from an overlay window, so the band falls back to the full display height with a
+     * status-bar-height top guard — degraded but never worse than ignoring insets entirely.
+     */
+    private fun resolveContentBand(): ContentBand {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = windowManager.currentWindowMetrics
+            val bounds = metrics.bounds
+            val insets = metrics.windowInsets
+            val topInset = insets.getInsets(
+                WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout(),
+            ).top
+            val bottomInset = maxOf(
+                insets.getInsets(WindowInsets.Type.ime()).bottom,
+                insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
+            )
+            return ContentBand(top = bounds.top + topInset, bottom = bounds.bottom - bottomInset)
+        }
+
+        val dm = context.resources.displayMetrics
+        val statusBarId = context.resources.getIdentifier("status_bar_height", "dimen", "android")
+        val statusBarHeight = if (statusBarId > 0) context.resources.getDimensionPixelSize(statusBarId) else 0
+        return ContentBand(top = statusBarHeight, bottom = dm.heightPixels)
     }
+
+    private data class ContentBand(val top: Int, val bottom: Int)
 
     private fun dpToPx(dp: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics)

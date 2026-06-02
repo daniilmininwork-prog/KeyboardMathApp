@@ -16,4 +16,13 @@
 
     <string name="overlay_status_enabled">Overlay mode is active.</string>
     <string name="overlay_status_disabled">Not yet enabled — tap above, then turn on \"Tally Math Overlay\".</string>
+
+    <!--
+      AC-7 (commit-only limitation): The overlay reads committed text from the active editor.
+      On keyboards that buffer keystrokes as in-progress composition (Gboard, Samsung Keyboard),
+      the math result chip appears only after the composing text is committed — typically on
+      space, punctuation, or a suggestion tap. This is a platform constraint: an accessibility
+      service cannot see the IME's composing region. The Tally IME does not have this limitation.
+    -->
+    <string name="overlay_limitation_commit_only">Result appears after you commit text (space, punctuation, or suggestion tap). This is a known limitation of overlay mode.</string>
 </resources>

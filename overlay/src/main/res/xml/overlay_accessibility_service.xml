@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  typeWindowsChanged (not typeWindowStateChanged): surfaces IME-window transitions without
+  the over-broad "any window event = blur" mapping that caused chip flashing (F2).
+
+  flagRetrieveInteractiveWindows: required for cross-window focus resolution and correct
+  placement relative to split-screen / DeX / foldable window frames (F5).
+
+  flagReportViewIds: required so node signatures are stable for the focus-token guard.
+
+  notificationTimeout="0": stop coalescing fast keystrokes; the generation guard handles
+  stale results, making per-keystroke coalescing unnecessary and harmful.
+-->
 <accessibility-service
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeViewFocused|typeViewTextChanged|typeViewTextSelectionChanged|typeWindowStateChanged"
+    android:accessibilityEventTypes="typeViewFocused|typeViewTextChanged|typeViewTextSelectionChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:description="@string/overlay_a11y_service_description"
-    android:notificationTimeout="100" />
+    android:notificationTimeout="0" />
