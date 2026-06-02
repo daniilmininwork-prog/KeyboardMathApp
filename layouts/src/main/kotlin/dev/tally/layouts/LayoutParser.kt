@@ -151,13 +151,16 @@ object LayoutParser {
 
     private fun resolveSpecialCode(location: String, name: String): Int =
         when (name.uppercase()) {
-            "SHIFT"   -> SpecialCode.SHIFT
-            "DELETE"  -> SpecialCode.DELETE
-            "SYMBOLS" -> SpecialCode.SYMBOLS
-            "ENTER"   -> SpecialCode.ENTER
-            "SPACE"   -> SpecialCode.SPACE
-            "GLOBE"   -> SpecialCode.GLOBE
-            else      -> throw LayoutParseException("$location unknown special code '$name'")
+            "SHIFT"            -> SpecialCode.SHIFT
+            "DELETE"           -> SpecialCode.DELETE
+            "SYMBOLS"          -> SpecialCode.SYMBOLS
+            "ENTER"            -> SpecialCode.ENTER
+            "SPACE"            -> SpecialCode.SPACE
+            "GLOBE"            -> SpecialCode.GLOBE
+            "ALPHA"            -> SpecialCode.ALPHA
+            "NUMERIC"          -> SpecialCode.NUMERIC
+            "NUMBER_ROW_TOGGLE" -> SpecialCode.NUMBER_ROW_TOGGLE
+            else               -> throw LayoutParseException("$location unknown special code '$name'")
         }
 
     /**

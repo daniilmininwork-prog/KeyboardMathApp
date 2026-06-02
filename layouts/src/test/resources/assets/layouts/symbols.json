@@ -1,0 +1,53 @@
+{
+  "id": "symbols",
+  "locale": "en-US",
+  "direction": "LTR",
+  "rows": [
+    {
+      "keys": [
+        { "code": 91,  "label": "[",  "width": 0.1 },
+        { "code": 93,  "label": "]",  "width": 0.1 },
+        { "code": 123, "label": "{",  "width": 0.1 },
+        { "code": 125, "label": "}",  "width": 0.1 },
+        { "code": 35,  "label": "#",  "width": 0.1 },
+        { "code": 37,  "label": "%",  "width": 0.1 },
+        { "code": 94,  "label": "^",  "width": 0.1 },
+        { "code": 42,  "label": "*",  "width": 0.1 },
+        { "code": 43,  "label": "+",  "width": 0.1 },
+        { "code": 61,  "label": "=",  "width": 0.1 }
+      ]
+    },
+    {
+      "keys": [
+        { "code": 95,   "label": "_",  "width": 0.1 },
+        { "code": 92,   "label": "\\", "width": 0.1 },
+        { "code": 124,  "label": "|",  "width": 0.1 },
+        { "code": 126,  "label": "~",  "width": 0.1 },
+        { "code": 60,   "label": "<",  "width": 0.1 },
+        { "code": 62,   "label": ">",  "width": 0.1 },
+        { "code": 8364, "label": "€",  "width": 0.1 },
+        { "code": 163,  "label": "£",  "width": 0.1 },
+        { "code": 165,  "label": "¥",  "width": 0.1 },
+        { "code": 8226, "label": "•",  "width": 0.1 }
+      ]
+    },
+    {
+      "keys": [
+        { "code": "NUMERIC", "label": "123", "width": 0.2, "isSpecial": true },
+        { "code": 46,  "label": ".", "width": 0.1 },
+        { "code": 44,  "label": ",", "width": 0.1 },
+        { "code": 63,  "label": "?", "width": 0.1 },
+        { "code": 33,  "label": "!", "width": 0.1 },
+        { "code": 39,  "label": "'", "width": 0.1 },
+        { "code": "DELETE", "label": "⌫", "width": 0.3, "isSpecial": true }
+      ]
+    },
+    {
+      "keys": [
+        { "code": "ALPHA", "label": "ABC", "width": 0.2, "isSpecial": true },
+        { "code": "SPACE", "label": " ",   "width": 0.6, "isSpecial": true },
+        { "code": "ENTER", "label": "↵",   "width": 0.2, "isSpecial": true }
+      ]
+    }
+  ]
+}

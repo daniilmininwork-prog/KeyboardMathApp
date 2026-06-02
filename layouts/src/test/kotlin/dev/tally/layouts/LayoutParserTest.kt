@@ -310,6 +310,55 @@ class LayoutParserTest {
         assertSame(def.rows[0].keys[0], descs[0].keyDef)
     }
 
+    /**
+     * Verifies that the cursor variable resets to 0.0 at the start of each row.
+     *
+     * Without this invariant, a bug where the cursor was NOT reset between rows would cause
+     * the first key of row 1 to have a non-zero `left` value (continuing from row 0's sum).
+     *
+     * The [reference QWERTY layout round-trips to descriptors] test checks this for the
+     * QWERTY file, but not as an explicit contract test with known input. Issue #26.
+     */
+    @Test
+    fun `toDescriptors cursor resets to 0 at start of each row`() {
+        val json = """
+            {
+              "id": "cursor_reset",
+              "locale": "en-US",
+              "direction": "LTR",
+              "rows": [
+                { "keys": [
+                    { "code": 97, "label": "a", "width": 0.3 },
+                    { "code": 98, "label": "b", "width": 0.3 },
+                    { "code": 99, "label": "c", "width": 0.4 }
+                  ]
+                },
+                { "keys": [
+                    { "code": 100, "label": "d", "width": 0.5 },
+                    { "code": 101, "label": "e", "width": 0.5 }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val descs = LayoutParser.toDescriptors(LayoutParser.parse(json))
+
+        // Row 0: left edges should be 0.0, 0.3, 0.6
+        val row0 = descs.filter { it.rowIndex == 0 }
+        assertEquals("row 0 key 0 left must be 0.0",  0.0f, row0[0].left, 1e-4f)
+        assertEquals("row 0 key 1 left must be 0.3",  0.3f, row0[1].left, 1e-4f)
+        assertEquals("row 0 key 2 left must be 0.6",  0.6f, row0[2].left, 1e-4f)
+
+        // Row 1: cursor must have reset — first key left must be 0.0, NOT 1.0
+        val row1 = descs.filter { it.rowIndex == 1 }
+        assertEquals(
+            "row 1 key 0 left must reset to 0.0 (cursor does not carry over from row 0)",
+            0.0f, row1[0].left, 1e-4f,
+        )
+        assertEquals("row 1 key 1 left must be 0.5", 0.5f, row1[1].left, 1e-4f)
+    }
+
     // ── Reference layout (en_US_QWERTY) ──────────────────────────────────────
 
     @Test
@@ -363,7 +412,115 @@ class LayoutParserTest {
         }
     }
 
+    // ── New special codes (T1.10) ─────────────────────────────────────────────
+
+    @Test
+    fun `parses ALPHA special code`() {
+        val json = layoutWithKeys("""{ "code": "ALPHA", "label": "ABC", "width": 0.2, "isSpecial": true }""")
+        val key = LayoutParser.parse(json).rows[0].keys[0]
+        assertEquals(SpecialCode.ALPHA, key.code)
+        assertTrue(key.isSpecial)
+    }
+
+    @Test
+    fun `parses NUMERIC special code`() {
+        val json = layoutWithKeys("""{ "code": "NUMERIC", "label": "123", "width": 0.2, "isSpecial": true }""")
+        val key = LayoutParser.parse(json).rows[0].keys[0]
+        assertEquals(SpecialCode.NUMERIC, key.code)
+    }
+
+    @Test
+    fun `parses NUMBER_ROW_TOGGLE special code`() {
+        val json = layoutWithKeys("""{ "code": "NUMBER_ROW_TOGGLE", "label": "#", "width": 0.1, "isSpecial": true }""")
+        val key = LayoutParser.parse(json).rows[0].keys[0]
+        assertEquals(SpecialCode.NUMBER_ROW_TOGGLE, key.code)
+    }
+
+    // ── Reference layouts: numeric.json ──────────────────────────────────────
+
+    @Test
+    fun `numeric layout parses without error`() {
+        val json = loadAsset("numeric.json")
+        val def = LayoutParser.parse(json)
+        assertEquals("numeric", def.id)
+        assertEquals(4, def.rows.size)
+    }
+
+    @Test
+    fun `numeric layout first row contains 10 digit keys`() {
+        val json = loadAsset("numeric.json")
+        val def = LayoutParser.parse(json)
+        assertEquals(10, def.rows[0].keys.size)
+        assertEquals("1", def.rows[0].keys[0].label)
+        assertEquals("0", def.rows[0].keys[9].label)
+    }
+
+    @Test
+    fun `numeric layout all row widths are valid`() {
+        validateWidths("numeric.json")
+    }
+
+    // ── Reference layouts: symbols.json ──────────────────────────────────────
+
+    @Test
+    fun `symbols layout parses without error`() {
+        val json = loadAsset("symbols.json")
+        val def = LayoutParser.parse(json)
+        assertEquals("symbols", def.id)
+        assertEquals(4, def.rows.size)
+    }
+
+    @Test
+    fun `symbols layout first row contains 10 symbol keys`() {
+        val json = loadAsset("symbols.json")
+        val def = LayoutParser.parse(json)
+        assertEquals(10, def.rows[0].keys.size)
+        assertEquals("[", def.rows[0].keys[0].label)
+    }
+
+    @Test
+    fun `symbols layout all row widths are valid`() {
+        validateWidths("symbols.json")
+    }
+
+    // ── Reference layouts: number_row.json ───────────────────────────────────
+
+    @Test
+    fun `number_row layout parses without error`() {
+        val json = loadAsset("number_row.json")
+        val def = LayoutParser.parse(json)
+        assertEquals("number_row", def.id)
+        assertEquals(1, def.rows.size)
+    }
+
+    @Test
+    fun `number_row layout contains 10 digit keys`() {
+        val json = loadAsset("number_row.json")
+        val def = LayoutParser.parse(json)
+        assertEquals(10, def.rows[0].keys.size)
+        assertEquals("1", def.rows[0].keys[0].label)
+        assertEquals("0", def.rows[0].keys[9].label)
+    }
+
+    @Test
+    fun `number_row layout width sum is exactly 1_0`() {
+        validateWidths("number_row.json")
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun loadAsset(filename: String): String =
+        javaClass.getResourceAsStream("/assets/layouts/$filename")
+            ?.bufferedReader()?.readText()
+            ?: error("$filename not found in test resources")
+
+    private fun validateWidths(filename: String) {
+        val def = LayoutParser.parse(loadAsset(filename))
+        def.rows.forEachIndexed { idx, row ->
+            val total = row.keys.fold(0.0f) { acc, k -> acc + k.width }
+            assertTrue("row[$idx] width sum $total exceeds 1.0", total <= 1.0f + 1e-4f)
+        }
+    }
 
     private fun minimalLayout(direction: String): String = """
         {
