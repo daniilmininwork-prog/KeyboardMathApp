@@ -18,6 +18,14 @@
     <string name="pref_sound_summary">Play a click sound on each keypress</string>
     <string name="pref_number_row_title">Number row</string>
     <string name="pref_number_row_summary">Show a dedicated number row above the letter keys</string>
+    <string name="pref_autocorrect_title">Autocorrect</string>
+    <string name="pref_autocorrect_summary">Fix likely typos automatically when you press space</string>
+    <string name="pref_auto_space_title">Auto-space after suggestions</string>
+    <string name="pref_auto_space_summary">Add a space automatically after tapping a suggestion</string>
+    <string name="pref_auto_cap_title">Auto-capitalisation</string>
+    <string name="pref_auto_cap_summary">Capitalise the first letter of each sentence automatically</string>
+    <string name="pref_double_space_period_title">Double-space inserts period</string>
+    <string name="pref_double_space_period_summary">Tap the space bar twice to add a full stop and a space</string>
     <string name="pref_insert_exact_title">Insert exact value</string>
     <string name="pref_insert_exact_summary">Replace the expression with the full-precision decimal instead of the formatted result</string>
     <string name="pref_locale_title">Locale override</string>

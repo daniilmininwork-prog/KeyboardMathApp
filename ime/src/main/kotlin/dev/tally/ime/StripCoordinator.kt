@@ -162,9 +162,15 @@ internal class StripCoordinator(
             )
             .take(MAX_WORD_SLOTS)
 
+        // Surface the leading AUTOCORRECT candidate separately so the controller can apply it
+        // on Space without re-running the decoder. Ranking already places AUTOCORRECT first, so
+        // the head of [ranked] is the candidate when one exists.
+        val topAutocorrect = ranked.firstOrNull { it.kind == SuggestionKind.AUTOCORRECT }
+
         return StripState(
             mathSuggestion = math,
             wordCandidates = ranked,
+            topAutocorrect = topAutocorrect,
         )
     }
 
@@ -180,10 +186,15 @@ internal class StripCoordinator(
  *
  * @param mathSuggestion  MATH candidate for the leading reserved slot; null = slot empty.
  * @param wordCandidates  Up to [StripCoordinator.MAX_WORD_SLOTS] word/autocorrect candidates.
+ * @param topAutocorrect  The leading AUTOCORRECT candidate (if any) extracted from
+ *                        [wordCandidates]. Carried alongside the rendered list so the
+ *                        controller can apply autocorrect-on-space using the candidate's
+ *                        calibrated [Suggestion.confidence] without re-querying the decoder.
  */
 internal data class StripState(
     val mathSuggestion: Suggestion?,
     val wordCandidates: List<Suggestion>,
+    val topAutocorrect: Suggestion? = null,
 ) {
     companion object {
         val EMPTY = StripState(mathSuggestion = null, wordCandidates = emptyList())

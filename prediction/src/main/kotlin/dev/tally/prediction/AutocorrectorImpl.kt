@@ -56,11 +56,32 @@ class AutocorrectorImpl internal constructor(
         val typedScore = candidates.firstOrNull { it.first.equals(typed, ignoreCase = true) }?.second
             ?: (topScore - CORRECTION_THRESHOLD - 1f)  // typed word not in beam → correct freely
 
-        return if (topScore - (typedScore) >= CORRECTION_THRESHOLD) {
-            Suggestion(kind = SuggestionKind.AUTOCORRECT, text = topWord, score = topScore)
+        val margin = topScore - typedScore
+        return if (margin >= CORRECTION_THRESHOLD) {
+            Suggestion(
+                kind = SuggestionKind.AUTOCORRECT,
+                text = topWord,
+                score = topScore,
+                confidence = confidenceFor(margin),
+            )
         } else {
             null
         }
+    }
+
+    /**
+     * Maps the score [margin] (how far the correction beats the typed word) to a 0..1
+     * confidence via a logistic curve centred on [CORRECTION_THRESHOLD].
+     *
+     * The raw beam scores are unbounded log-probabilities, so they cannot feed a fixed
+     * cutoff directly — a margin of exactly [CORRECTION_THRESHOLD] (the firing floor)
+     * maps to 0.5, and the curve saturates toward 1.0 as the correction pulls further
+     * ahead. Auto-replace-on-space gates on this value so only clearly-better corrections
+     * are applied silently; borderline cases stay as the user typed them.
+     */
+    private fun confidenceFor(margin: Float): Float {
+        val x = margin - CORRECTION_THRESHOLD
+        return 1f / (1f + Math.exp((-CONFIDENCE_STEEPNESS * x).toDouble()).toFloat())
     }
 
     override fun query(ctx: EditingContext, policy: FieldPolicy): List<Suggestion> =
@@ -82,5 +103,14 @@ class AutocorrectorImpl internal constructor(
          * to fire.  Calibrated for a conservative error rate.
          */
         const val CORRECTION_THRESHOLD: Float = 3f
+
+        /**
+         * Logistic steepness for the margin→confidence mapping. Calibrated against real decoder
+         * output: a clear single-edit typo (e.g. the "teh"→"the" transposition) beats the typed
+         * word by ~1 score unit beyond [CORRECTION_THRESHOLD], and at k=2.0 that maps to ≈0.88 —
+         * just over the controller's ~0.85 auto-replace gate. Borderline corrections (margin only
+         * fractionally over the threshold) stay below the gate and are left for the user to tap.
+         */
+        const val CONFIDENCE_STEEPNESS: Float = 2.0f
     }
 }

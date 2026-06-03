@@ -24,7 +24,8 @@ import dev.tally.keyboard.engine.ResolvedKey
  * Caller responsibilities:
  *   - Call [show] from the UI thread on ACTION_DOWN.
  *   - Call [dismiss] from the UI thread on ACTION_UP, ACTION_POINTER_UP, and ACTION_CANCEL.
- *   - Never call [show] when [previewMasked] is true (see [KeyPlaneView]).
+ *   - Pass `redacted = true` when [KeyPlaneView.previewMasked] is set so secure fields keep the
+ *     tactile bubble without ever rendering the typed glyph (see [KeyPlaneView]).
  */
 @SuppressLint("InflateParams")  // PopupWindow content has no parent; null root is correct.
 internal class KeyPreviewPopup(private val context: Context) {
@@ -52,12 +53,16 @@ internal class KeyPreviewPopup(private val context: Context) {
      * [anchor] must be an attached view (typically [KeyPlaneView] itself) so the popup
      * window has a valid parent window token. Coordinates are in the anchor's local space.
      *
+     * When [redacted] is true the bubble is shown with a neutral dot instead of the key glyph,
+     * so password and no-suggestion fields keep the tactile press feedback without revealing the
+     * typed character to shoulder surfers or screen-recorders.
+     *
      * Does nothing when the popup window content cannot be measured (e.g., the view
      * is not yet laid out). The early return is defensive; in practice [anchor] is
      * always measured by the time the first DOWN arrives.
      */
-    fun show(key: ResolvedKey, anchor: View) {
-        labelView.text = key.keyDef.label
+    fun show(key: ResolvedKey, anchor: View, redacted: Boolean = false) {
+        labelView.text = if (redacted) REDACTED_GLYPH else key.keyDef.label
 
         // Measure the popup content so we know its dimensions before placing it.
         labelView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
@@ -85,8 +90,15 @@ internal class KeyPreviewPopup(private val context: Context) {
     /** Returns true while the popup is visible. Exposed for test assertions. */
     val isShowing: Boolean get() = popup.isShowing
 
+    /** The text currently rendered in the bubble. Exposed for test assertions only. */
+    internal val displayedText: CharSequence get() = labelView.text
+
     private companion object {
         const val WRAP = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
         const val ELEVATION_DP = 4f
+
+        // Neutral mark shown instead of the key glyph in redacted (masked-field) mode. A bullet
+        // gives the bubble visible content for tactile feedback while leaking no character.
+        const val REDACTED_GLYPH = "•"  // •
     }
 }

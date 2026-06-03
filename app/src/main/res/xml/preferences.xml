@@ -55,6 +55,34 @@
         app:iconSpaceReserved="false" />
 
     <SwitchPreferenceCompat
+        app:key="autocorrect_enabled"
+        app:title="@string/pref_autocorrect_title"
+        app:summary="@string/pref_autocorrect_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="auto_space_enabled"
+        app:title="@string/pref_auto_space_title"
+        app:summary="@string/pref_auto_space_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="auto_cap_enabled"
+        app:title="@string/pref_auto_cap_title"
+        app:summary="@string/pref_auto_cap_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="double_space_period_enabled"
+        app:title="@string/pref_double_space_period_title"
+        app:summary="@string/pref_double_space_period_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
         app:key="insert_exact_value"
         app:title="@string/pref_insert_exact_title"
         app:summary="@string/pref_insert_exact_summary"

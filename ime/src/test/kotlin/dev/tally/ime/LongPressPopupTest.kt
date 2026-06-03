@@ -92,7 +92,7 @@ class LongPressPopupTest {
             )),
         )
 
-        view.keyListener = { key -> committed += key }
+        view.keyListener = { key, _ -> committed += key }
         // Unmasked by default in tests so preview-related assertions work normally.
         view.previewMasked = false
     }

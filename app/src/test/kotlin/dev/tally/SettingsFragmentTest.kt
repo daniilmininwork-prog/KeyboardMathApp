@@ -104,4 +104,36 @@ class SettingsFragmentTest {
             findPref(TallyPreferences.KEY_INSERT_EXACT_VALUE),
         )
     }
+
+    @Test
+    fun settings_hasAutocorrectToggle() {
+        assertNotNull(
+            "Missing 'autocorrect_enabled' preference — PHASE 1a autocorrect toggle absent from settings UI",
+            findPref(TallyPreferences.KEY_AUTOCORRECT),
+        )
+    }
+
+    @Test
+    fun settings_hasAutoSpaceToggle() {
+        assertNotNull(
+            "Missing 'auto_space_enabled' preference — PHASE 1a auto-space toggle absent from settings UI",
+            findPref(TallyPreferences.KEY_AUTO_SPACE),
+        )
+    }
+
+    @Test
+    fun settings_hasAutoCapToggle() {
+        assertNotNull(
+            "Missing 'auto_cap_enabled' preference — PHASE 1b auto-cap toggle absent from settings UI",
+            findPref(TallyPreferences.KEY_AUTO_CAP),
+        )
+    }
+
+    @Test
+    fun settings_hasDoubleSpacePeriodToggle() {
+        assertNotNull(
+            "Missing 'double_space_period_enabled' preference — PHASE 1b toggle absent from settings UI",
+            findPref(TallyPreferences.KEY_DOUBLE_SPACE_PERIOD),
+        )
+    }
 }

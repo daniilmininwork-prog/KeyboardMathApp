@@ -435,4 +435,55 @@ class ComposingTextManagerTest {
         assertFalse("mirror.isMidBatchEdit must be false after teardown", mirror.isMidBatchEdit)
         assertEquals("composingText must be empty after teardown", "", manager.composingText)
     }
+
+    // ── replaceComposingWith (autocorrect-on-space) ───────────────────────────
+
+    @Test
+    fun replaceComposingWith_swapsWordAndCommits() {
+        manager.appendToComposing('t', ic)
+        manager.appendToComposing('e', ic)
+        manager.appendToComposing('h', ic)
+        ic.calls.clear()
+
+        manager.replaceComposingWith("the", ic)
+
+        assertTrue(ic.calls.any { it.startsWith("setComposingText(the") })
+        assertTrue(ic.calls.any { it == "finishComposingText()" })
+        assertFalse("composing region must be cleared after replace", manager.isComposing)
+    }
+
+    @Test
+    fun replaceComposingWith_fixesMirrorToCandidate() {
+        // The optimistic per-keystroke appends leave the mirror reading "teh"; after the swap it
+        // must read "the" — not "tehthe" — so the next prediction/math query sees the right word.
+        manager.appendToComposing('t', ic)
+        manager.appendToComposing('e', ic)
+        manager.appendToComposing('h', ic)
+        assertEquals("teh", mirror.textBefore.toString())
+
+        manager.replaceComposingWith("the", ic)
+
+        assertEquals("the", mirror.textBefore.toString())
+    }
+
+    @Test
+    fun replaceComposingWith_emptyComposing_noOp() {
+        manager.replaceComposingWith("the", ic)
+
+        assertTrue("no IC calls when nothing is composing", ic.calls.isEmpty())
+    }
+
+    @Test
+    fun replaceComposingWith_batchEditsAreBalanced() {
+        manager.appendToComposing('t', ic)
+        manager.appendToComposing('e', ic)
+        manager.appendToComposing('h', ic)
+        ic.calls.clear()
+
+        manager.replaceComposingWith("the", ic)
+
+        val begins = ic.calls.count { it == "beginBatchEdit()" }
+        val ends   = ic.calls.count { it == "endBatchEdit()" }
+        assertEquals("batch edits for replace must be balanced", begins, ends)
+    }
 }

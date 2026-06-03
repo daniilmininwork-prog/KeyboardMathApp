@@ -81,7 +81,7 @@ class BackspaceRepeatTest {
 
         view.currentGeometry = geometry
         view.currentRows = rows
-        view.keyListener = { key -> emittedKeys += key }
+        view.keyListener = { key, _ -> emittedKeys += key }
         view.backspaceRepeatListener = { repeatCount++ }
         view.wordDeleteListener = { wordDeleteFires++ }
 

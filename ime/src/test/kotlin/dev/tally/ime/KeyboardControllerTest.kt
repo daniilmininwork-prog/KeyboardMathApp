@@ -296,10 +296,133 @@ class KeyboardControllerTest {
         assertEquals(KeyboardState.SYMBOLS, controller.currentState())
     }
 
+    // ── Autocorrect on space (PHASE 1a) ───────────────────────────────────────
+
+    @Test
+    fun handleKey_space_appliesHighConfidenceAutocorrect() {
+        // Type "teh" into the composing region.
+        controller.handleKey(Key(KeyCode.Char('t'), "t"), ic)
+        controller.handleKey(Key(KeyCode.Char('e'), "e"), ic)
+        controller.handleKey(Key(KeyCode.Char('h'), "h"), ic)
+
+        // Strip surfaced a high-confidence correction "the" for the typed "teh".
+        controller.setAutocorrectCandidate(autocorrect("the", confidence = 0.95f))
+        ic.calls.clear()
+
+        controller.handleKey(Key(KeyCode.Space, ""), ic)
+
+        // The composing region must be replaced with "the", then a space committed → "the ".
+        assertTrue(
+            "Composing region must be replaced with the correction",
+            ic.calls.any { it.startsWith("setComposingText(the") },
+        )
+        assertTrue("Replacement must be finished", ic.calls.any { it == "finishComposingText()" })
+        assertTrue("Trailing space must be committed", ic.calls.any { it.startsWith("commitText( ") })
+        assertEquals("", controller.composingText())
+        // The typed word "teh" must never be committed verbatim.
+        assertTrue(
+            "Typed 'teh' must not be committed",
+            ic.calls.none { it.startsWith("commitText(teh") },
+        )
+    }
+
+    @Test
+    fun handleKey_space_autocorrectDisabled_preservesTypedWord() {
+        controller.setAutocorrectEnabled(false)
+
+        controller.handleKey(Key(KeyCode.Char('t'), "t"), ic)
+        controller.handleKey(Key(KeyCode.Char('e'), "e"), ic)
+        controller.handleKey(Key(KeyCode.Char('h'), "h"), ic)
+
+        // Even with a confident candidate present, the disabled flag must suppress replacement.
+        controller.setAutocorrectCandidate(autocorrect("the", confidence = 0.99f))
+        ic.calls.clear()
+
+        controller.handleKey(Key(KeyCode.Space, ""), ic)
+
+        // The typed word is finished as-is (not replaced) and a plain space is committed.
+        assertTrue(
+            "Disabled autocorrect must not replace the composing region",
+            ic.calls.none { it.startsWith("setComposingText(the") },
+        )
+        assertTrue("Composing word must be finished verbatim", ic.calls.any { it == "finishComposingText()" })
+        assertTrue("Plain space must be committed", ic.calls.any { it.startsWith("commitText( ") })
+        assertEquals("", controller.composingText())
+    }
+
+    @Test
+    fun handleKey_space_lowConfidenceCandidate_doesNotAutocorrect() {
+        controller.handleKey(Key(KeyCode.Char('t'), "t"), ic)
+        controller.handleKey(Key(KeyCode.Char('e'), "e"), ic)
+        controller.handleKey(Key(KeyCode.Char('h'), "h"), ic)
+
+        // Below the 0.85 gate → leave the typed word alone.
+        controller.setAutocorrectCandidate(autocorrect("the", confidence = 0.50f))
+        ic.calls.clear()
+
+        controller.handleKey(Key(KeyCode.Space, ""), ic)
+
+        assertTrue(
+            "Low-confidence candidate must not be applied",
+            ic.calls.none { it.startsWith("setComposingText(the") },
+        )
+        assertTrue("Plain space must be committed", ic.calls.any { it.startsWith("commitText( ") })
+    }
+
+    @Test
+    fun handleKey_space_candidateEqualsTypedWord_doesNotAutocorrect() {
+        controller.handleKey(Key(KeyCode.Char('t'), "t"), ic)
+        controller.handleKey(Key(KeyCode.Char('h'), "h"), ic)
+        controller.handleKey(Key(KeyCode.Char('e'), "e"), ic)
+
+        // Candidate matches what was typed (case-insensitive) → nothing to correct.
+        controller.setAutocorrectCandidate(autocorrect("The", confidence = 0.99f))
+        ic.calls.clear()
+
+        controller.handleKey(Key(KeyCode.Space, ""), ic)
+
+        assertTrue(
+            "Identical candidate must not trigger a replace",
+            ic.calls.none { it.startsWith("setComposingText(") },
+        )
+        assertTrue("Plain space must be committed", ic.calls.any { it.startsWith("commitText( ") })
+    }
+
+    @Test
+    fun handleKey_space_candidateClearedAfterUse() {
+        controller.handleKey(Key(KeyCode.Char('t'), "t"), ic)
+        controller.handleKey(Key(KeyCode.Char('e'), "e"), ic)
+        controller.handleKey(Key(KeyCode.Char('h'), "h"), ic)
+        controller.setAutocorrectCandidate(autocorrect("the", confidence = 0.95f))
+        controller.handleKey(Key(KeyCode.Space, ""), ic)
+
+        // Type a new word without setting a fresh candidate; the stale one must not reapply.
+        controller.handleKey(Key(KeyCode.Char('x'), "x"), ic)
+        controller.handleKey(Key(KeyCode.Char('y'), "y"), ic)
+        controller.handleKey(Key(KeyCode.Char('z'), "z"), ic)
+        ic.calls.clear()
+
+        controller.handleKey(Key(KeyCode.Space, ""), ic)
+
+        assertTrue(
+            "Stale candidate from the previous word must not be reapplied",
+            ic.calls.none { it.startsWith("setComposingText(the") },
+        )
+        assertEquals("", controller.composingText())
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun editorInfoForType(inputType: Int): EditorInfo =
         EditorInfo().apply { this.inputType = inputType }
+
+    private fun autocorrect(text: String, confidence: Float): dev.tally.keyboard.engine.Suggestion =
+        dev.tally.keyboard.engine.Suggestion(
+            kind = dev.tally.keyboard.engine.SuggestionKind.AUTOCORRECT,
+            text = text,
+            score = 0f,
+            confidence = confidence,
+        )
 }
 
 /**

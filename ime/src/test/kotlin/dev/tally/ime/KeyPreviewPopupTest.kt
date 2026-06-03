@@ -8,6 +8,7 @@ import dev.tally.keyboard.engine.KeyDef
 import dev.tally.keyboard.engine.KeyGeometry
 import dev.tally.keyboard.engine.KeyId
 import dev.tally.keyboard.engine.ResolvedKey
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -73,7 +74,7 @@ class KeyPreviewPopupTest {
 
         view.currentGeometry = geometry
         // Wire a keyListener so the view does not ignore UP events.
-        view.keyListener = {}
+        view.keyListener = { _, _ -> }
         // Default to unmasked so preview tests exercise the normal show/hide path.
         // Tests that verify masking behaviour set previewMasked = true themselves.
         view.previewMasked = false
@@ -108,24 +109,40 @@ class KeyPreviewPopupTest {
     // ── Masked fields ─────────────────────────────────────────────────────────
 
     @Test
-    fun preview_notShown_whenPreviewMasked() {
+    fun preview_shownRedacted_whenPreviewMasked() {
         view.previewMasked = true
-        dispatchDown(pointerId = 0, x = 50f, y = 25f)
+        dispatchDown(pointerId = 0, x = 50f, y = 25f)  // key(0,0) = "a"
 
-        assertFalse("Preview must not appear in masked fields", view.isPreviewShowing(0))
+        // Masked fields keep the tactile bubble for feedback but must never render the glyph,
+        // so the bubble shows a neutral dot rather than the pressed key's character.
+        assertTrue("Bubble must still appear in masked fields for tactile feedback",
+            view.isPreviewShowing(0))
+        assertEquals("Masked bubble must not leak the typed glyph",
+            "•", view.previewText(0).toString())
     }
 
     @Test
-    fun preview_shownAgain_afterMaskLifted() {
+    fun preview_showsGlyph_whenUnmasked() {
+        // The default (unmasked) field renders the real key glyph in the bubble.
+        dispatchDown(pointerId = 0, x = 50f, y = 25f)  // key(0,0) = "a"
+
+        assertTrue(view.isPreviewShowing(0))
+        assertEquals("a", view.previewText(0).toString())
+    }
+
+    @Test
+    fun preview_showsGlyphAgain_afterMaskLifted() {
         view.previewMasked = true
         dispatchDown(pointerId = 0, x = 50f, y = 25f)
         dispatchUp(pointerId = 0, x = 50f, y = 25f)
 
-        // Lift the mask (e.g., user moved to a non-password field).
+        // Lift the mask (e.g., user moved to a non-password field): the glyph returns.
         view.previewMasked = false
         dispatchDown(pointerId = 0, x = 50f, y = 25f)
 
         assertTrue("Preview should appear once mask is lifted", view.isPreviewShowing(0))
+        assertEquals("Unmasked bubble shows the real glyph again",
+            "a", view.previewText(0).toString())
     }
 
     // ── Empty-label keys ──────────────────────────────────────────────────────

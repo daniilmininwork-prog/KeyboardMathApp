@@ -30,9 +30,15 @@ enum class SuggestionKind {
  * @param score  Relative quality estimate (higher = better). Used for intra-kind
  *               ranking and for tie-breaking across kinds that share a slot.
  *               Range is unspecified; only relative ordering matters.
+ * @param confidence  Normalised 0..1 self-belief, present only for kinds where an
+ *               automatic action (e.g. autocorrect-on-space) gates on a calibrated
+ *               threshold. [score] is unbounded and not comparable across queries,
+ *               so it cannot drive a fixed cutoff; [confidence] can. Null when the
+ *               source does not produce a calibrated value (math, prediction, etc.).
  */
 data class Suggestion(
     val kind: SuggestionKind,
     val text: String,
     val score: Float,
+    val confidence: Float? = null,
 )

@@ -86,7 +86,7 @@ class PointerTrackerDispatchTest {
 
         view.currentGeometry = geometry
         view.currentRows = rows
-        view.keyListener = { key -> emittedKeys += key }
+        view.keyListener = { key, _ -> emittedKeys += key }
     }
 
     // ── Single-finger basics ──────────────────────────────────────────────────

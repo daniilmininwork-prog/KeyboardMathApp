@@ -64,6 +64,26 @@ class AutocorrectorImplTest : FunSpec({
         suggestion?.kind shouldBe SuggestionKind.AUTOCORRECT
     }
 
+    test("autocorrect suggestion carries a calibrated 0..1 confidence") {
+        val smallDict = DecoderTestHelper.dict(
+            "hello" to 5000,
+            "help"  to 1000,
+        )
+        val decoder   = BeamDecoder(dictionary = smallDict, freqCache = FrequencyCache.NOOP)
+        val corrector = AutocorrectorImpl(decoder = decoder, dictionary = smallDict, geometry = geo)
+
+        val suggestion = corrector.correct(EditingContext("helo", "", null), FieldPolicy.PERMISSIVE)
+        // When a correction fires it must expose a bounded confidence so the controller can gate
+        // auto-replace on a fixed threshold (the raw score is unbounded and cannot be compared).
+        suggestion?.let {
+            it.confidence.shouldNotBeNull()
+            (it.confidence!! in 0f..1f) shouldBe true
+            // A correction at exactly the firing margin maps to 0.5; this one cleared the
+            // threshold so it must be at least that confident.
+            (it.confidence!! >= 0.5f) shouldBe true
+        }
+    }
+
     test("updateGeometry changes active geometry") {
         val corrector = makeCorrector()
         val newGeo = DecoderTestHelper.simpleGeometry("zyxwvutsrqponmlkjihgfedcba")

@@ -27,6 +27,18 @@ class KeyboardHeightPolicyTest {
         assertEquals(expected, result)
     }
 
+    /**
+     * Pins the portrait row height to the value chosen in the PHASE 1b sizing-polish pass.
+     *
+     * The other tests derive their expectations from the constant, so they would silently track
+     * any accidental edit. This asserts the literal so a regression to the cramped 54 dp (or any
+     * unintended change) is caught directly.
+     */
+    @Test
+    fun portrait_rowHeightConstant_is57dp() {
+        assertEquals(57f, KeyboardHeightPolicy.ROW_HEIGHT_DP_PORTRAIT)
+    }
+
     @Test
     fun landscape_usesLandscapeRowHeight() {
         // Swap width and height to simulate landscape.

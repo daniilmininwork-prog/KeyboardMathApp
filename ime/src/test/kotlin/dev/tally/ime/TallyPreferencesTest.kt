@@ -143,4 +143,60 @@ class TallyPreferencesTest {
         assertEquals(150, prefs.floatingOffsetX)
         assertEquals(300, prefs.floatingOffsetY)
     }
+
+    // ── Autocorrect / auto-space (PHASE 1a) ───────────────────────────────────
+
+    @Test
+    fun autocorrectEnabled_defaultIsTrue() {
+        assertTrue("autocorrect must default to on", prefs.autocorrectEnabled)
+    }
+
+    @Test
+    fun autocorrectEnabled_roundtrip() {
+        prefs.autocorrectEnabled = false
+        assertFalse(prefs.autocorrectEnabled)
+        prefs.autocorrectEnabled = true
+        assertTrue(prefs.autocorrectEnabled)
+    }
+
+    @Test
+    fun autoSpaceEnabled_defaultIsTrue() {
+        assertTrue("auto-space must default to on", prefs.autoSpaceEnabled)
+    }
+
+    @Test
+    fun autoSpaceEnabled_roundtrip() {
+        prefs.autoSpaceEnabled = false
+        assertFalse(prefs.autoSpaceEnabled)
+        prefs.autoSpaceEnabled = true
+        assertTrue(prefs.autoSpaceEnabled)
+    }
+
+    // ── Auto-cap / double-space-to-period (PHASE 1b) ──────────────────────────
+
+    @Test
+    fun autoCapEnabled_defaultIsTrue() {
+        assertTrue("auto-cap must default to on", prefs.autoCapEnabled)
+    }
+
+    @Test
+    fun autoCapEnabled_roundtrip() {
+        prefs.autoCapEnabled = false
+        assertFalse(prefs.autoCapEnabled)
+        prefs.autoCapEnabled = true
+        assertTrue(prefs.autoCapEnabled)
+    }
+
+    @Test
+    fun doubleSpacePeriod_defaultIsTrue() {
+        assertTrue("double-space-to-period must default to on", prefs.doubleSpacePeriod)
+    }
+
+    @Test
+    fun doubleSpacePeriod_roundtrip() {
+        prefs.doubleSpacePeriod = false
+        assertFalse(prefs.doubleSpacePeriod)
+        prefs.doubleSpacePeriod = true
+        assertTrue(prefs.doubleSpacePeriod)
+    }
 }

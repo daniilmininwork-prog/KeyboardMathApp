@@ -41,7 +41,7 @@ class KeyPlaneViewIntegrationTest {
     fun setUp() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         view = KeyPlaneView(ctx)
-        view.keyListener = { key -> committedKeys += key }
+        view.keyListener = { key, _ -> committedKeys += key }
 
         // Real wiring: set the rows the way the service does and let the view size + lay out
         // itself. No currentGeometry is assigned by the test — buildGeometry must run on layout.

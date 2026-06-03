@@ -22,7 +22,7 @@ package dev.tally.keyboard.engine
 object KeyboardHeightPolicy {
 
     /** Row height for portrait orientation, in dp. */
-    const val ROW_HEIGHT_DP_PORTRAIT = 54f
+    const val ROW_HEIGHT_DP_PORTRAIT = 57f
 
     /** Row height for landscape orientation, in dp. */
     const val ROW_HEIGHT_DP_LANDSCAPE = 40f

@@ -86,7 +86,7 @@ class CursorGestureTest {
 
         view.currentGeometry = geometry
         view.currentRows     = rows
-        view.keyListener     = { key -> committedKeys += key }
+        view.keyListener     = { key, _ -> committedKeys += key }
         view.cursorStepListener = { steps, select ->
             cursorSteps += steps
             selectFlags += select

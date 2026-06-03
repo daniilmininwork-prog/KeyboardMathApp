@@ -70,6 +70,48 @@ class TallyPreferences(context: Context) {
         set(v) = prefs.edit().putBoolean(KEY_NUMBER_ROW, v).apply()
 
     /**
+     * Whether a high-confidence typed word is silently corrected when the user presses Space.
+     *
+     * On by default — autocorrect is the expected behaviour for a soft keyboard. When false the
+     * keyboard never replaces what the user typed, even if a correction is offered in the strip.
+     */
+    var autocorrectEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTOCORRECT, true)
+        set(v) = prefs.edit().putBoolean(KEY_AUTOCORRECT, v).apply()
+
+    /**
+     * Whether committing a word from the suggestion strip auto-appends a trailing space.
+     *
+     * On by default, matching the Gboard convention that tapping a candidate starts the next
+     * word cleanly. Does not affect the literal space produced by pressing the Space key.
+     */
+    var autoSpaceEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_SPACE, true)
+        set(v) = prefs.edit().putBoolean(KEY_AUTO_SPACE, v).apply()
+
+    /**
+     * Whether the shift key auto-capitalises at the start of a sentence.
+     *
+     * On by default, matching the system-keyboard convention. When false the keyboard never
+     * raises shift on its own — neither on field entry nor after ". " — so the user controls
+     * every capital. Does not affect a manual shift tap, which always works regardless.
+     */
+    var autoCapEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_CAP, true)
+        set(v) = prefs.edit().putBoolean(KEY_AUTO_CAP, v).apply()
+
+    /**
+     * Whether typing two spaces in quick succession is replaced with ". " (period + space).
+     *
+     * On by default, matching the Gboard/iOS convention for ending a sentence quickly. The
+     * replacement only fires when a word character precedes the first space; double-space after
+     * punctuation or whitespace inserts two literal spaces so list/indent typing is unaffected.
+     */
+    var doubleSpacePeriod: Boolean
+        get() = prefs.getBoolean(KEY_DOUBLE_SPACE_PERIOD, true)
+        set(v) = prefs.edit().putBoolean(KEY_DOUBLE_SPACE_PERIOD, v).apply()
+
+    /**
      * The active keyboard theme preset key (matches [dev.tally.design.ThemePreset.key]).
      *
      * Defaults to "wallpaper" so new installs on Android 12+ automatically follow the system
@@ -161,6 +203,10 @@ class TallyPreferences(context: Context) {
         const val KEY_SOUND              = "sound"
         const val KEY_LOCALE_OVERRIDE    = "locale_override"
         const val KEY_NUMBER_ROW         = "number_row_enabled"
+        const val KEY_AUTOCORRECT        = "autocorrect_enabled"
+        const val KEY_AUTO_SPACE         = "auto_space_enabled"
+        const val KEY_AUTO_CAP           = "auto_cap_enabled"
+        const val KEY_DOUBLE_SPACE_PERIOD = "double_space_period_enabled"
         const val KEY_THEME_PRESET       = "theme_preset"
         const val KEY_ACTIVE_SUBTYPE     = "active_subtype"
         const val DEFAULT_SUBTYPE_ID     = "en_US_QWERTY"

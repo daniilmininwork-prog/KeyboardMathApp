@@ -105,6 +105,37 @@ class StripCoordinatorTest {
     }
 
     @Test
+    fun topAutocorrect_surfacedSeparatelyForController() {
+        coordinator.setWordSource { _, _ ->
+            listOf(
+                Suggestion(SuggestionKind.PREDICTION,  "pred", -1f),
+                Suggestion(SuggestionKind.AUTOCORRECT, "the",  -1f, confidence = 0.95f),
+            )
+        }
+
+        coordinator.requestUpdate(EditingContext.EMPTY, FieldPolicy.PERMISSIVE)
+        idleMain()
+
+        val state = states.last()
+        // The controller reads topAutocorrect to apply autocorrect-on-space without re-decoding.
+        assertNotNull("Top autocorrect must be surfaced", state.topAutocorrect)
+        assertEquals("the", state.topAutocorrect!!.text)
+        assertEquals(0.95f, state.topAutocorrect!!.confidence)
+    }
+
+    @Test
+    fun topAutocorrect_nullWhenNoAutocorrectCandidate() {
+        coordinator.setWordSource { _, _ ->
+            listOf(Suggestion(SuggestionKind.PREDICTION, "hello", -1f))
+        }
+
+        coordinator.requestUpdate(EditingContext.EMPTY, FieldPolicy.PERMISSIVE)
+        idleMain()
+
+        assertNull("No AUTOCORRECT candidate → topAutocorrect must be null", states.last().topAutocorrect)
+    }
+
+    @Test
     fun suggestionsDisabled_noWordCandidates() {
         coordinator.setWordSource { _, _ ->
             listOf(Suggestion(SuggestionKind.PREDICTION, "hello", -2f))

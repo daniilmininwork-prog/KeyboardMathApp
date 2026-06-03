@@ -89,7 +89,7 @@ class KeyboardExploreByTouchHelperTest {
             KeyRow(listOf(key10, key11)),
         )
 
-        view.keyListener = { key -> clickedKeys += key }
+        view.keyListener = { key, _ -> clickedKeys += key }
         view.currentGeometry = geometry
         view.currentRows = rows
 
@@ -315,13 +315,13 @@ class KeyboardExploreByTouchHelperTest {
         // The a11y click listener calls the same keyListener as a real touch event.
         // Confirm the same Key object (by code) is delivered in both paths.
         val realTapKeys = mutableListOf<Key>()
-        view.keyListener = { key ->
+        view.keyListener = { key, _ ->
             clickedKeys += key
             realTapKeys += key
         }
 
         // Simulate a real touch (via keyListener directly as the PointerTrackerDispatchTest does).
-        view.keyListener?.invoke(Key(KeyCode.Char('a'), "a"))
+        view.keyListener?.invoke(Key(KeyCode.Char('a'), "a"), android.os.SystemClock.uptimeMillis())
 
         // Now simulate TalkBack ACTION_CLICK.
         helper.performActionForTest(0, AccessibilityNodeInfoCompat.ACTION_CLICK)

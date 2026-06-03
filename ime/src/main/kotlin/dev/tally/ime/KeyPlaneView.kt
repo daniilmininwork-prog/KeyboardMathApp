@@ -64,7 +64,9 @@ internal class KeyPlaneView @JvmOverloads constructor(
     internal val a11yHelper: KeyboardExploreByTouchHelper =
         KeyboardExploreByTouchHelper(
             host = this,
-            keyClickListener = { key -> keyListener?.invoke(key) },
+            // Accessibility activations have no MotionEvent; use the current uptime, which can
+            // never fall inside the double-space window of a real preceding touch.
+            keyClickListener = { key -> keyListener?.invoke(key, android.os.SystemClock.uptimeMillis()) },
         )
 
     init {
@@ -75,9 +77,13 @@ internal class KeyPlaneView @JvmOverloads constructor(
      * Called on the main thread whenever a key should be committed.
      *
      * Set by the IME service after view inflation. Receives the resolved [Key]
-     * from [currentGeometry] so the service never needs to re-derive it.
+     * from [currentGeometry] so the service never needs to re-derive it, plus the
+     * touch-up event time (ms, [android.os.SystemClock.uptimeMillis] clock) of the
+     * gesture that committed it. The event time drives the double-space-to-period
+     * window so it reflects finger timing rather than dispatch latency. Non-touch
+     * activations (accessibility) pass the current uptime, which never pairs.
      */
-    var keyListener: ((Key) -> Unit)? = null
+    var keyListener: ((Key, Long) -> Unit)? = null
 
     /**
      * Called on the main thread on every finger-down event that lands on a key.
@@ -219,14 +225,17 @@ internal class KeyPlaneView @JvmOverloads constructor(
         }
 
     /**
-     * When true, key-preview popups are suppressed entirely.
+     * When true, the key-preview bubble is shown in redacted mode (a neutral dot, no glyph)
+     * so secure fields keep tactile feedback without leaking the typed character.
      *
-     * Set from [FieldPolicy.previewMasked] in [TallyInputMethodService.onStartInputView].
-     * True for password fields, no-suggestions fields, and the default-private pre-field state.
-     * Showing a magnified bubble of the pressed key while a password is typed would reveal
-     * each character to shoulder surfers or screen-recorders.
+     * Set from [FieldPolicy.previewMasked] in [TallyInputMethodService.onStartInputView],
+     * which runs on every field entry — so the policy, not this default, governs once a field
+     * is focused. The default is fail-open (false: full glyph preview) so the very first
+     * pre-field state still feels alive; the masked bubble only appears for password and
+     * no-suggestion fields, where a magnified glyph would expose each character to shoulder
+     * surfers or screen-recorders.
      */
-    var previewMasked: Boolean = true
+    var previewMasked: Boolean = false
 
     private val pool = PointerTrackerPool()
 
@@ -257,18 +266,35 @@ internal class KeyPlaneView @JvmOverloads constructor(
     private val bgPaint         = Paint()
     private val keyPaint        = Paint(Paint.ANTI_ALIAS_FLAG)
     private val specialKeyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pressedPaint    = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
     }
 
+    // KeyIds with a finger currently down on them. Populated on ACTION_DOWN / ACTION_POINTER_DOWN
+    // and drained on UP / POINTER_UP / CANCEL; onDraw paints these with a pressed tint so a held
+    // key reads as pressed. A set (not a single field) so simultaneous fingers each show feedback.
+    private val pressedKeys = HashSet<KeyId>()
+
+    // The KeyId currently tinted for each active pointer, keyed by pointerId. Lets UP and MOVE
+    // remove/swap the exact entry a finger owns, so rollover (finger slides A→B) moves the tint
+    // and two fingers on one key don't clear each other's press. Kept in lock-step with pressedKeys.
+    private val pressedKeyByPointer: MutableMap<Int, KeyId> = HashMap()
+
     // Half of the inter-key gaps. These are visual insets applied at draw time only (Step 2);
     // the geometry stores full key rects so touch targets fill the gap and never shrink
     // (see PointerTrackerPool hit-test, which uses ResolvedKey.contains on the full rect).
-    private val hGapHalf = dpToPx(3f)   // half of the 6dp horizontal gap between keys
-    private val vGapHalf = dpToPx(4f)   // half of the 8dp vertical gap between rows
+    //
+    // PHASE 1b sizing polish: the gaps were tightened (6dp→5dp horizontal, 8dp→6dp vertical) so
+    // the drawn face fills more of its hit rect. The previous gaps left a wide dead-looking margin
+    // around each key, making the keyboard feel cramped even though the touch targets were large;
+    // a smaller inset makes what the user sees agree more closely with what they can tap.
+    private val hGapHalf = dpToPx(2.5f) // half of the 5dp horizontal gap between keys
+    private val vGapHalf = dpToPx(3f)   // half of the 6dp vertical gap between rows
 
     // Key-face metrics, matching TallyKeyboardView so the two views render identically.
-    private val cornerRadius      = dpToPx(8f)
+    // PHASE 1b: corner radius raised 8dp→10dp for a softer, more modern key-cap silhouette.
+    private val cornerRadius      = dpToPx(10f)
     private val keyTextSizePx     = spToPx(18f)
     private val specialTextSizePx = spToPx(14f)
 
@@ -358,6 +384,10 @@ internal class KeyPlaneView @JvmOverloads constructor(
         keyPaint.color        = theme.keyBg
         specialKeyPaint.color = theme.keySpecialBg
         textPaint.color       = theme.keyText
+        // Pressed tint: blend the key text colour over the key background so the held key darkens
+        // (light theme) or lightens (dark theme) toward its own glyph colour, staying on-theme for
+        // either palette. Derived per-frame so a light↔dark switch is reflected without a recreate.
+        pressedPaint.color    = blendTint(theme.keyBg, theme.keyText, PRESSED_TINT_FRACTION)
 
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
@@ -398,12 +428,19 @@ internal class KeyPlaneView @JvmOverloads constructor(
             val right  = resolvedKey.right - hGapHalf
             val bottom = resolvedKey.bottom - vGapHalf
 
-            // Resting key face only: special vs normal, matching TallyKeyboardView. Press feedback
-            // is carried by the key-preview bubble and long-press tray popups, not by repainting
-            // the key here — the touch path deliberately never invalidates on DOWN/MOVE, so a
-            // per-key pressed paint would be dead state that never reaches the canvas.
-            val paint = if (keyDef.isSpecial) specialKeyPaint else keyPaint
-            canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, paint)
+            // A held key fills its FULL hit rect (the un-inset geometry rect) with the pressed
+            // tint so feedback covers the entire touch target, not just the smaller drawn face.
+            // The resting face is skipped for that key so the tint reads cleanly rather than being
+            // overpainted by the opaque face. Resting keys draw their inset face as before.
+            if (resolvedKey.id in pressedKeys) {
+                canvas.drawRoundRect(
+                    resolvedKey.left, resolvedKey.top, resolvedKey.right, resolvedKey.bottom,
+                    cornerRadius, cornerRadius, pressedPaint,
+                )
+            } else {
+                val paint = if (keyDef.isSpecial) specialKeyPaint else keyPaint
+                canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, paint)
+            }
 
             // Skip the Space label (it stays blank, per the reference) and any code-only key.
             if (keyDef.code != SpecialCode.SPACE && keyDef.label.isNotEmpty()) {
@@ -431,15 +468,23 @@ internal class KeyPlaneView @JvmOverloads constructor(
 
                 val resolvedKey: ResolvedKey? = if (keyId != null) geometry.keyById(keyId) else null
 
+                // Visual press feedback: mark the key down and repaint so onDraw tints its hit rect.
+                if (keyId != null) {
+                    setPressedKey(pointerId, keyId)
+                    invalidate()
+                }
+
                 // Haptic + sound feedback fires on finger contact, before the commit on UP.
                 if (keyId != null) {
                     keyDownFeedbackListener?.invoke()
                 }
 
-                // Key-preview: show for labelled character keys in unmasked fields.
-                if (!previewMasked && resolvedKey != null && resolvedKey.keyDef.label.isNotEmpty()) {
+                // Key-preview: show for labelled character keys. In masked fields the bubble still
+                // appears (so the press feels tactile) but renders a neutral dot instead of the
+                // glyph, so a password character is never magnified above the finger.
+                if (resolvedKey != null && resolvedKey.keyDef.label.isNotEmpty()) {
                     val popup = previews.getOrPut(pointerId) { KeyPreviewPopup(context) }
-                    popup.show(resolvedKey, this)
+                    popup.show(resolvedKey, this, redacted = previewMasked)
                 }
 
                 // Long-press: arm a timer for keys that carry alternates.
@@ -475,7 +520,19 @@ internal class KeyPlaneView @JvmOverloads constructor(
                         )
                     }
                     val x = event.getX(pointerIdx)
-                    pool.onMove(pointerId, x, event.getY(pointerIdx))
+                    val movedKeyId = pool.onMove(pointerId, x, event.getY(pointerIdx))
+
+                    // Rollover: if the finger slid onto a different key, move its pressed tint so the
+                    // highlight tracks the finger. Only the pointer that owns the press is touched, so
+                    // a second finger resting on the old key keeps it lit. Repaint only on a real swap.
+                    if (pointerId in pressedKeyByPointer && movedKeyId != pressedKeyByPointer[pointerId]) {
+                        if (movedKeyId != null) {
+                            setPressedKey(pointerId, movedKeyId)
+                        } else {
+                            clearPressedKey(pointerId)
+                        }
+                        invalidate()
+                    }
 
                     // Route x-coordinate to an active long-press tray for cell highlighting.
                     if (pointerId in longPressActive) {
@@ -507,6 +564,8 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 val pointerId = event.getPointerId(actionIndex)
                 cancelPendingLongPress(pointerId)
                 dismissPreview(pointerId)
+                // Release this pointer's pressed tint and repaint so the key returns to rest.
+                if (clearPressedKey(pointerId)) invalidate()
                 if (pointerId == backspacePointerId) {
                     cancelBackspaceRepeat()
                 }
@@ -532,10 +591,10 @@ internal class KeyPlaneView @JvmOverloads constructor(
                             code  = KeyCode.Char(altLabel[0]),
                             label = altLabel,
                         )
-                        keyListener?.invoke(altKey)
+                        keyListener?.invoke(altKey, event.eventTime)
                     } else if (base != null) {
                         // Lifted without selecting: commit the primary.
-                        keyListener?.invoke(base)
+                        keyListener?.invoke(base, event.eventTime)
                     } else if (altIndex >= 0) {
                         // altIndex is set but base is null — longPressSourceKey did not contain
                         // this pointerId. This is a race with tearDownAllLongPresses on ACTION_CANCEL.
@@ -547,7 +606,7 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 } else {
                     val keyId = pool.onUp(pointerId)
                     if (keyId != null && !spaceGestureConsumed) {
-                        resolveKey(keyId)?.let { key -> keyListener?.invoke(key) }
+                        resolveKey(keyId)?.let { key -> keyListener?.invoke(key, event.eventTime) }
                     }
                 }
             }
@@ -559,6 +618,8 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 dismissAllPreviews()
                 cancelBackspaceRepeat()
                 cancelSpaceCursorGesture()
+                clearAllPressedKeys()
+                invalidate()
                 pool.onCancel()
             }
         }
@@ -679,6 +740,21 @@ internal class KeyPlaneView @JvmOverloads constructor(
         isSpecial = isSpecial,
     )
 
+    /**
+     * Returns [base] with [fraction] of [over] blended into each RGB channel (alpha forced opaque).
+     *
+     * Used to derive the pressed-key tint from theme tokens without a dedicated color resource, so
+     * the feedback tracks any palette (light, dark, or dynamic) the [theme] resolves at draw time.
+     */
+    private fun blendTint(base: Int, over: Int, fraction: Float): Int {
+        val f = fraction.coerceIn(0f, 1f)
+        val inv = 1f - f
+        val r = (android.graphics.Color.red(base) * inv + android.graphics.Color.red(over) * f).toInt()
+        val g = (android.graphics.Color.green(base) * inv + android.graphics.Color.green(over) * f).toInt()
+        val b = (android.graphics.Color.blue(base) * inv + android.graphics.Color.blue(over) * f).toInt()
+        return android.graphics.Color.argb(0xFF, r.coerceIn(0, 255), g.coerceIn(0, 255), b.coerceIn(0, 255))
+    }
+
     private fun dpToPx(dp: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics)
 
@@ -769,6 +845,38 @@ internal class KeyPlaneView @JvmOverloads constructor(
         previews[pointerId]?.dismiss()
     }
 
+    // ── Pressed-key tint lifecycle ─────────────────────────────────────────────
+
+    /**
+     * Records [keyId] as the pressed key for [pointerId], releasing any key the pointer
+     * previously held. Keeps [pressedKeys] (drawn) in lock-step with [pressedKeyByPointer].
+     */
+    private fun setPressedKey(pointerId: Int, keyId: KeyId) {
+        val previous = pressedKeyByPointer.put(pointerId, keyId)
+        if (previous != null && previous != keyId) {
+            // Only un-tint the old key if no other finger is still on it.
+            if (pressedKeyByPointer.values.none { it == previous }) pressedKeys -= previous
+        }
+        pressedKeys += keyId
+    }
+
+    /**
+     * Drops the pressed tint owned by [pointerId]. Returns true if anything changed (so the
+     * caller can decide whether to invalidate). The shared [pressedKeys] entry is removed only
+     * when no other pointer is still resting on that same key.
+     */
+    private fun clearPressedKey(pointerId: Int): Boolean {
+        val keyId = pressedKeyByPointer.remove(pointerId) ?: return false
+        if (pressedKeyByPointer.values.none { it == keyId }) pressedKeys -= keyId
+        return true
+    }
+
+    /** Clears every pressed tint (ACTION_CANCEL). */
+    private fun clearAllPressedKeys() {
+        pressedKeyByPointer.clear()
+        pressedKeys.clear()
+    }
+
     private fun dismissAllPreviews() {
         previews.values.forEach { it.dismiss() }
     }
@@ -778,12 +886,25 @@ internal class KeyPlaneView @JvmOverloads constructor(
     /** Exposes the pool size for testing without exposing the pool itself. */
     internal fun activePointerCount(): Int = pool.size
 
+    /** Number of keys currently drawn with the pressed tint. Exposed for test assertions only. */
+    internal fun pressedKeyCount(): Int = pressedKeys.size
+
+    /** Returns true if [keyId] is currently drawn pressed. Exposed for test assertions only. */
+    internal fun isKeyPressed(keyId: KeyId): Boolean = keyId in pressedKeys
+
     /**
      * Returns true if a key-preview popup is currently visible for [pointerId].
      * Exposed for test assertions only.
      */
     internal fun isPreviewShowing(pointerId: Int): Boolean =
         previews[pointerId]?.isShowing == true
+
+    /**
+     * Returns the glyph currently rendered in the preview bubble for [pointerId], or null if no
+     * bubble exists. Used by tests to assert masked fields show the redacted dot, not the key.
+     */
+    internal fun previewText(pointerId: Int): CharSequence? =
+        previews[pointerId]?.displayedText
 
     /**
      * Returns true if a long-press alternate tray is currently visible for [pointerId].
@@ -833,5 +954,9 @@ internal class KeyPlaneView @JvmOverloads constructor(
 
         // Sentinel used for backspacePointerId when no backspace pointer is active.
         const val NO_ACTIVE_POINTER = -1
+
+        // Fraction of the key-text colour blended into the key background for the pressed tint.
+        // ~20% is enough to be clearly visible as a press without obscuring the key label.
+        const val PRESSED_TINT_FRACTION = 0.20f
     }
 }

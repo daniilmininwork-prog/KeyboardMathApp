@@ -210,8 +210,12 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
             try {
                 val stack = DecoderFactory.create(dict)
                 decoderStack = stack
-                // Wire the word predictor into the coordinator now that it is ready.
-                stripCoordinator?.setWordSource(stack.wordPredictor)
+                // Wire autocorrect + word prediction into the coordinator now that the decoder is
+                // ready. Both must be queried so AUTOCORRECT candidates (the only kind carrying a
+                // calibrated confidence) reach the strip and feed autocorrect-on-space.
+                stripCoordinator?.setWordSource(
+                    CombinedWordSource(autocorrect = stack.autocorrector, prediction = stack.wordPredictor)
+                )
             } catch (e: IllegalArgumentException) {
                 // BeamDecoder / WordPredictorImpl constructors throw IllegalArgumentException
                 // for invalid dictionary parameters (e.g. empty word list, bad beam width).
@@ -275,6 +279,10 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         controller.setInputConnectionProvider { currentInputConnection }
 
         controller.setNumberRowEnabled(prefs.numberRowEnabled)
+        controller.setAutocorrectEnabled(prefs.autocorrectEnabled)
+        controller.setAutoSpaceEnabled(prefs.autoSpaceEnabled)
+        controller.setAutoCapEnabled(prefs.autoCapEnabled)
+        controller.setDoubleSpacePeriod(prefs.doubleSpacePeriod)
         controller.numberRowChangeListener = { enabled ->
             prefs.numberRowEnabled = enabled
             syncKeyPlaneRows()
@@ -303,8 +311,13 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         stripCoordinator = coordinator
 
         // If the dictionary was already loaded before the view was created (e.g. fast device or
-        // re-creation after rotation), wire the real predictor immediately.
-        decoderStack?.wordPredictor?.let { coordinator.setWordSource(it) }
+        // re-creation after rotation), wire the real sources immediately. Both autocorrect and
+        // prediction are needed so the strip surfaces AUTOCORRECT candidates for space-correction.
+        decoderStack?.let { stack ->
+            coordinator.setWordSource(
+                CombinedWordSource(autocorrect = stack.autocorrector, prediction = stack.wordPredictor)
+            )
+        }
 
         suggestionStrip = SuggestionStripView(this).also { strip ->
             // Register the chip's KeyTheme so dynamic color changes are reflected at draw time.
@@ -321,9 +334,9 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
             // Register the view's KeyTheme so dynamic color changes from TallyThemeManager are
             // reflected in the key bed on the next onDraw without a view recreate.
             themeManager.addKeyTheme(plane.theme)
-            plane.keyListener = { key ->
+            plane.keyListener = { key, eventTimeMs ->
                 val ic = currentInputConnection
-                if (ic != null) handleKey(key, ic)
+                if (ic != null) handleKey(key, ic, eventTimeMs)
             }
             plane.keyDownFeedbackListener = {
                 feedback.hapticsEnabled = prefs.hapticsEnabled
@@ -382,7 +395,18 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
 
         fieldPolicy = FieldPolicyFactory.from(info)
 
+        // Re-read auto-cap before configure(): configure() consults autoCapEnabled to decide
+        // whether to honour the field's initialCapsMode, so the current preference must be in
+        // place first or a toggle made while hidden would not take effect on this field's entry.
+        controller.setAutoCapEnabled(prefs.autoCapEnabled)
+
         controller.configure(info, restarting, currentInputConnection)
+
+        // Re-read the remaining typing prefs on every field entry so a settings change made while
+        // the keyboard was hidden takes effect without restarting the service.
+        controller.setAutocorrectEnabled(prefs.autocorrectEnabled)
+        controller.setAutoSpaceEnabled(prefs.autoSpaceEnabled)
+        controller.setDoubleSpacePeriod(prefs.doubleSpacePeriod)
 
         keyPlane?.previewMasked = fieldPolicy.previewMasked
         syncKeyPlaneRows()
@@ -473,7 +497,35 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
             oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd,
         )
         val shouldEvaluate = controller.mirror.reconcile(newSelStart, newSelEnd, currentInputConnection)
-        if (shouldEvaluate) requestStripUpdate()
+        if (shouldEvaluate) {
+            // The cursor moved for a reason we did not author (or a commit just landed): re-derive
+            // the editor's caps mode for the new position so the shift visual auto-capitalises at a
+            // sentence start — e.g. after the double-space-to-period inserts ". ". onCapsMode is a
+            // no-op when the user disabled auto-cap or has a manual shift latched, so this is safe
+            // to call on every external update. Guarded to text fields; getCursorCapsMode returns 0
+            // for non-text input, which onCapsMode treats as "no caps".
+            updateAutoCaps()
+            requestStripUpdate()
+        }
+    }
+
+    /**
+     * Pushes the editor's current cursor caps mode into the controller.
+     *
+     * Reads [InputConnection.getCursorCapsMode] against the active field's inputType — this is the
+     * canonical way to learn whether the cursor sits at a sentence/word/character-cap boundary. The
+     * controller's [KeyboardController.onCapsMode] decides whether to act (it respects the auto-cap
+     * preference and never overrides a user-initiated shift). Skipped for non-text fields, where
+     * caps has no meaning, and when the IC is null.
+     */
+    private fun updateAutoCaps() {
+        val ic = currentInputConnection ?: return
+        val inputType = currentInputEditorInfo?.inputType ?: return
+        if (inputType and android.text.InputType.TYPE_MASK_CLASS != android.text.InputType.TYPE_CLASS_TEXT) return
+        val capsMode = ic.getCursorCapsMode(inputType)
+        controller.onCapsMode(capsMode)
+        // The shift layer may have changed; re-sync the rendered rows so the case visual updates.
+        syncKeyPlaneRows()
     }
 
     // ── Key dispatch ──────────────────────────────────────────────────────────
@@ -488,7 +540,11 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
      *
      * Kept `internal` so instrumentation tests can drive it without a live IME session.
      */
-    internal fun handleKey(key: Key, ic: InputConnection) {
+    internal fun handleKey(
+        key: Key,
+        ic: InputConnection,
+        eventTimeMs: Long = android.os.SystemClock.uptimeMillis(),
+    ) {
         // Auto-commit math on space before delegating to the controller (03 §4.1, T2.4).
         if (key.code == KeyCode.Space && mathSource.hasResult) {
             commitMathFromSource()
@@ -496,7 +552,7 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         }
 
         try {
-            controller.handleKey(key, ic)
+            controller.handleKey(key, ic, eventTimeMs)
         } catch (e: Exception) {
             // This catch is for stack-trace enrichment only — it does NOT provide recovery.
             // The rethrow means the exception still propagates to the main-thread looper,
@@ -610,6 +666,12 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
      * Always called on the main thread (posted by [StripCoordinator]).
      */
     private fun bindStripState(state: StripState) {
+        // Surface the calibrated top AUTOCORRECT candidate to the controller so a Space press can
+        // apply it without re-running the decoder (the controller gates on confidence + the
+        // autocorrectEnabled preference). Recomputed on every strip update so it always reflects
+        // the current composing word.
+        controller.setAutocorrectCandidate(state.topAutocorrect)
+
         val strip = suggestionStrip ?: return
         strip.bind(
             state     = state,
@@ -709,8 +771,9 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
                     Log.w(TAG, "commitWordCandidate: commitText returned false")
                 }
             }
-            // Append a trailing space so the next word starts cleanly (matching Gboard convention).
-            if (!ic.commitText(" ", 1)) {
+            // Append a trailing space so the next word starts cleanly (matching Gboard convention),
+            // unless the user disabled auto-space.
+            if (prefs.autoSpaceEnabled && !ic.commitText(" ", 1)) {
                 Log.w(TAG, "commitWordCandidate: space commitText returned false")
             }
         } finally {

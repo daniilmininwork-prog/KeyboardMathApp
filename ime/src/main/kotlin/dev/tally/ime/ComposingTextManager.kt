@@ -83,6 +83,40 @@ internal class ComposingTextManager(
     }
 
     /**
+     * Replace the current composing region with [replacement] and commit it.
+     *
+     * Used by autocorrect-on-space: the in-progress word is swapped for the corrected
+     * candidate, then the caller appends the space via [commitText]. The whole sequence runs
+     * inside one batch edit so the editor sees an atomic replace-then-space with clean undo.
+     *
+     * The [InputConnectionMirror] tracked the typed word optimistically (one [appendCommitted]
+     * per keystroke), so the old word is rolled back from the mirror by code-point count before
+     * the replacement is appended — otherwise the mirror would read "tehthe" and corrupt the
+     * next prediction/math query.
+     *
+     * No-op when there is no composing region or [ic] is null; callers fall back to a plain
+     * commit in that case.
+     *
+     * @param ic Active [InputConnection]; no-op when null.
+     */
+    fun replaceComposingWith(replacement: CharSequence, ic: InputConnection?) {
+        if (ic == null || composingBuffer.isEmpty()) return
+        val oldCodePoints = composingBuffer.codePointCount(0, composingBuffer.length)
+        withBatchEdit(ic) {
+            if (!ic.setComposingText(replacement, 1)) {
+                Log.w(TAG, "replaceComposingWith/setComposingText returned false — IC may be invalidated")
+            }
+            if (!ic.finishComposingText()) {
+                Log.w(TAG, "replaceComposingWith/finishComposingText returned false — IC may be invalidated")
+            }
+        }
+        composingBuffer.clear()
+        // Roll the optimistic per-keystroke mirror appends back, then reflect the replacement.
+        mirror.deleteBeforeCodePoints(oldCodePoints)
+        mirror.appendCommitted(replacement)
+    }
+
+    /**
      * Commit [text] directly without going through the composing region.
      *
      * Use this for space, punctuation that terminates a word (commits and then appends the
