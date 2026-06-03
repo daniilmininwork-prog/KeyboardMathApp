@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG-ONLY manifest. Merged into the application manifest for the debug build type only,
+  so DebugTypingActivity never reaches a release artifact. Adds NO permissions — the
+  no-INTERNET (and minimal-permission) guarantee is preserved.
+
+  The activity is exported and launchable so the emulator harness can start it directly:
+    adb shell am start -n dev.tally/dev.tally.DebugTypingActivity
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="dev.tally.DebugTypingActivity"
+            android:exported="true"
+            android:label="Tally Debug Typing">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
