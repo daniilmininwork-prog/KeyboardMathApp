@@ -13,9 +13,11 @@ import dev.tally.design.TallyThemeManager
 import dev.tally.design.ThemePreset
 import dev.tally.glue.MathEvaluator
 import dev.tally.glue.TallyPreferences
+import dev.tally.keyboard.engine.BackspaceSpeed
 import dev.tally.keyboard.engine.EditingContext
 import dev.tally.keyboard.engine.FieldPolicy
 import dev.tally.keyboard.engine.FormFactorMode
+import dev.tally.keyboard.engine.LongPressDelay
 import dev.tally.keyboard.engine.FormFactorTransform
 import dev.tally.keyboard.engine.KeyboardHeightPolicy
 import dev.tally.keyboard.engine.SubtypeList
@@ -214,8 +216,19 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
                 // ready. Both must be queried so AUTOCORRECT candidates (the only kind carrying a
                 // calibrated confidence) reach the strip and feed autocorrect-on-space.
                 stripCoordinator?.setWordSource(
-                    CombinedWordSource(autocorrect = stack.autocorrector, prediction = stack.wordPredictor)
+                    CombinedWordSource(
+                        autocorrect = stack.autocorrector,
+                        prediction  = stack.wordPredictor,
+                        spell       = SpellSuggestionSource(stack.spellChecker) { prefs.spellCheckEnabled },
+                    )
                 )
+                // Install the on-device spell-check predicate now that the dictionary is loaded so
+                // the composing region can flag out-of-dictionary words with a red underline. The
+                // SpellChecker lookup is a thread-safe binary search; the controller calls it on the
+                // main input thread, so the loaded instance is published here for it to read.
+                stack.spellChecker.let { checker ->
+                    controller.setSpellChecker { word -> checker.isMisspelled(word) }
+                }
             } catch (e: IllegalArgumentException) {
                 // BeamDecoder / WordPredictorImpl constructors throw IllegalArgumentException
                 // for invalid dictionary parameters (e.g. empty word list, bad beam width).
@@ -280,6 +293,7 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
 
         controller.setNumberRowEnabled(prefs.numberRowEnabled)
         controller.setAutocorrectEnabled(prefs.autocorrectEnabled)
+        controller.setSpellCheckEnabled(prefs.spellCheckEnabled)
         controller.setAutoSpaceEnabled(prefs.autoSpaceEnabled)
         controller.setAutoCapEnabled(prefs.autoCapEnabled)
         controller.setDoubleSpacePeriod(prefs.doubleSpacePeriod)
@@ -315,7 +329,11 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         // prediction are needed so the strip surfaces AUTOCORRECT candidates for space-correction.
         decoderStack?.let { stack ->
             coordinator.setWordSource(
-                CombinedWordSource(autocorrect = stack.autocorrector, prediction = stack.wordPredictor)
+                CombinedWordSource(
+                    autocorrect = stack.autocorrector,
+                    prediction  = stack.wordPredictor,
+                    spell       = SpellSuggestionSource(stack.spellChecker) { prefs.spellCheckEnabled },
+                )
             )
         }
 
@@ -405,10 +423,21 @@ class TallyInputMethodService : InputMethodService(), KeyboardHost {
         // Re-read the remaining typing prefs on every field entry so a settings change made while
         // the keyboard was hidden takes effect without restarting the service.
         controller.setAutocorrectEnabled(prefs.autocorrectEnabled)
+        controller.setSpellCheckEnabled(prefs.spellCheckEnabled)
         controller.setAutoSpaceEnabled(prefs.autoSpaceEnabled)
         controller.setDoubleSpacePeriod(prefs.doubleSpacePeriod)
 
         keyPlane?.previewMasked = fieldPolicy.previewMasked
+        // Re-read the keycap-hint preference on every field entry so a toggle made while the
+        // keyboard was hidden is reflected on the next focus without restarting the service.
+        keyPlane?.altCharHints = prefs.altCharHints
+        // Re-read input-timing prefs on every field entry (Stage 2) so a change made while the
+        // keyboard was hidden takes effect on the next press without restarting the service.
+        keyPlane?.backspaceSpeed   = BackspaceSpeed.fromKey(prefs.backspaceSpeedKey)
+        keyPlane?.longPressDelayMs = LongPressDelay.fromKey(prefs.longPressDelayKey).delayMs
+        // Re-read the key glyph font scale (Stage 3) on every field entry; it is applied at draw
+        // time in KeyPlaneView so it never changes the key footprint, only the rendered glyph size.
+        keyPlane?.keyFontScale     = prefs.keyFontScale
         syncKeyPlaneRows()
         syncFormFactor()
 

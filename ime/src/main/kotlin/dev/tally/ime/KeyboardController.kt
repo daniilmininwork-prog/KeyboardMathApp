@@ -151,11 +151,58 @@ internal class KeyboardController {
     val mirror = InputConnectionMirror()
     private val composing = ComposingTextManager(mirror)
 
+    /**
+     * Whether the red spell-check underline is active (Stage 5).
+     *
+     * Initialised from [TallyPreferences.spellCheckEnabled] via [setSpellCheckEnabled] and re-read
+     * on each field entry. When false the composing decorator never flags a word, regardless of the
+     * spell-check predicate, so the editor shows its normal composing styling.
+     */
+    private var spellCheckEnabled: Boolean = true
+
+    /**
+     * Predicate that reports whether a word is out-of-dictionary (misspelled).
+     *
+     * Set by [setSpellChecker] once the prediction dictionary finishes loading; null until then so
+     * no word is flagged during the brief load window. The lambda runs on the main input thread and
+     * must be cheap — it is a binary-search dictionary lookup ([dev.tally.prediction.SpellChecker]).
+     */
+    private var misspelledPredicate: ((String) -> Boolean)? = null
+
     /** The tri-state shift machine. Exposed for test inspection. */
     internal val shiftMachine = ShiftStateMachine()
 
+    init {
+        // Install the spell-check decorator once; it reads the current predicate/flag on every call
+        // so a dictionary load or a settings change takes effect without re-installing.
+        composing.composingDecorator = decorator@{ word ->
+            if (!spellCheckEnabled) return@decorator word
+            val predicate = misspelledPredicate ?: return@decorator word
+            val plain = word.toString()
+            SpellUnderline.decorate(word, misspelled = predicate(plain))
+        }
+    }
+
     fun setInputConnectionProvider(provider: () -> InputConnection?) {
         inputConnectionProvider = provider
+    }
+
+    /**
+     * Sets whether the red spell-check underline is active. Read from [TallyPreferences] at session
+     * start and on each field entry so a settings change is picked up without restarting.
+     */
+    fun setSpellCheckEnabled(enabled: Boolean) {
+        spellCheckEnabled = enabled
+    }
+
+    /**
+     * Installs the out-of-dictionary predicate used to flag misspelled words.
+     *
+     * Called once the prediction dictionary has loaded (off the input thread) with a lambda backed
+     * by [dev.tally.prediction.SpellChecker.isMisspelled]. Passing null disables flagging.
+     */
+    fun setSpellChecker(predicate: ((String) -> Boolean)?) {
+        misspelledPredicate = predicate
     }
 
     /**

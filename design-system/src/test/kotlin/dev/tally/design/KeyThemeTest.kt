@@ -140,6 +140,99 @@ class KeyThemeTest {
         assertEquals(0xFF_0000FF.toInt(), config.textColorOverride)
     }
 
+    // ── Full-palette override (Stage 4) ───────────────────────────────────────
+
+    @Test
+    fun applyPalette_overridesEveryToken() {
+        val theme = KeyTheme(ctx)
+        val p = KeyPalette.HC_WHITE_ON_BLACK
+        theme.applyPalette(p)
+
+        assertEquals(p.keyboardBg,               theme.keyboardBg)
+        assertEquals(p.keyBg,                    theme.keyBg)
+        assertEquals(p.keySpecialBg,             theme.keySpecialBg)
+        assertEquals(p.keyPressedBg,             theme.keyPressedBg)
+        assertEquals(p.keyText,                  theme.keyText)
+        assertEquals(p.suggestionStripBg,        theme.suggestionStripBg)
+        assertEquals(p.chipBg,                   theme.chipBg)
+        assertEquals(p.chipText,                 theme.chipText)
+        assertEquals(p.keyPreviewBg,             theme.keyPreviewBg)
+        assertEquals(p.longPressPopupBg,         theme.longPressPopupBg)
+        assertEquals(p.longPressPopupSelectedBg, theme.longPressPopupSelectedBg)
+        assertEquals(p.keyBorder,                theme.keyBorder)
+    }
+
+    @Test
+    fun applyPalette_null_revertsToStaticResourceTokens() {
+        val theme = KeyTheme(ctx)
+        val staticKeyBg = theme.keyBg
+
+        theme.applyPalette(KeyPalette.HC_WHITE_ON_BLACK)
+        assertNotEquals(staticKeyBg, theme.keyBg)
+
+        theme.applyPalette(null)
+        assertEquals("Clearing the palette must restore the static token", staticKeyBg, theme.keyBg)
+    }
+
+    @Test
+    fun drawKeyBorders_reflectsActivePalette() {
+        val theme = KeyTheme(ctx)
+        assertEquals("No palette → no border", false, theme.drawKeyBorders)
+
+        theme.applyPalette(KeyPalette.LIGHT)
+        assertEquals("Base variant → no border", false, theme.drawKeyBorders)
+
+        theme.applyPalette(KeyPalette.HC_WHITE_ON_BLACK)
+        assertEquals("High-contrast → border on", true, theme.drawKeyBorders)
+    }
+
+    @Test
+    fun keyBorder_fallsBackToKeyTextWhenNoPalette() {
+        // Readers that ignore drawKeyBorders still get an on-theme stroke colour.
+        val theme = KeyTheme(ctx)
+        assertEquals(theme.keyText, theme.keyBorder)
+    }
+
+    @Test
+    fun palette_winsOverDynamicScheme() {
+        val theme = KeyTheme(ctx)
+        // Apply a dynamic scheme first (would normally tint chipBg/keyPressedBg)…
+        theme.applyDynamicColors(
+            DynamicColorScheme.Scheme(
+                primarySeed   = 0xFF_FF0000.toInt(),
+                secondarySeed = 0xFF_FF0000.toInt(),
+                neutralSeed   = 0xFF_FF0000.toInt(),
+            )
+        )
+        // …then a full palette, which must take total priority over the scheme's tinted tokens.
+        theme.applyPalette(KeyPalette.HC_WHITE_ON_BLACK)
+        assertEquals(KeyPalette.HC_WHITE_ON_BLACK.chipBg, theme.chipBg)
+        assertEquals(KeyPalette.HC_WHITE_ON_BLACK.keyPressedBg, theme.keyPressedBg)
+    }
+
+    @Test
+    fun afterClearingPalette_dynamicSchemeTakesEffectAgain() {
+        val theme = KeyTheme(ctx)
+        val staticChipBg = theme.chipBg
+        theme.applyDynamicColors(
+            DynamicColorScheme.Scheme(
+                primarySeed   = 0xFF_00FF00.toInt(),
+                secondarySeed = 0xFF_00FF00.toInt(),
+                neutralSeed   = 0xFF_00FF00.toInt(),
+            )
+        )
+        val tintedChipBg = theme.chipBg
+        assertNotEquals(staticChipBg, tintedChipBg)
+
+        // Palette masks the dynamic tint…
+        theme.applyPalette(KeyPalette.LIGHT)
+        assertEquals(KeyPalette.LIGHT.chipBg, theme.chipBg)
+
+        // …and clearing it falls back to the still-active dynamic scheme, not the static token.
+        theme.applyPalette(null)
+        assertEquals(tintedChipBg, theme.chipBg)
+    }
+
     // ── Per-draw semantics smoke test ─────────────────────────────────────────
 
     @Test

@@ -136,4 +136,41 @@ class SettingsFragmentTest {
             findPref(TallyPreferences.KEY_DOUBLE_SPACE_PERIOD),
         )
     }
+
+    @Test
+    fun settings_hasAltCharHintsToggle() {
+        assertNotNull(
+            "Missing 'alt_char_hints_enabled' preference — Stage 1 keycap-hint toggle absent from settings UI",
+            findPref(TallyPreferences.KEY_ALT_CHAR_HINTS),
+        )
+    }
+
+    @Test
+    fun settings_hasKeyFontScaleList() {
+        assertNotNull(
+            "Missing 'key_font_scale' preference — Stage 3 key text-size control absent from settings UI",
+            findPref(TallyPreferences.KEY_KEY_FONT_SCALE),
+        )
+    }
+
+    @Test
+    fun settings_hasThemePresetList() {
+        assertNotNull(
+            "Missing 'theme_preset' preference — Stage 4 theme picker absent from settings UI",
+            findPref(TallyPreferences.KEY_THEME_PRESET),
+        )
+    }
+
+    @Test
+    fun themePresetList_entryValues_matchThemePresetKeys() {
+        // The ListPreference values must round-trip through ThemePreset.fromKey() — a mismatch would
+        // silently fall back to Wallpaper at runtime, so guard the XML against drift.
+        val pref = findPref(TallyPreferences.KEY_THEME_PRESET)
+                as androidx.preference.ListPreference
+        val values = pref.entryValues.map { it.toString() }.toSet()
+        val keys = dev.tally.design.ThemePreset.all().map { it.key }.toSet()
+        org.junit.Assert.assertEquals(
+            "theme_preset entryValues must exactly match ThemePreset.all() keys", keys, values,
+        )
+    }
 }

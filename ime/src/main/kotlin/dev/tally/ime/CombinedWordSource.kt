@@ -20,22 +20,36 @@ import dev.tally.keyboard.engine.SuggestionSource
  * @param autocorrect Queried first so its (usually single) AUTOCORRECT candidate is always present
  *                    in the merged list; the coordinator then surfaces it as the top correction.
  * @param prediction  Queried for ordinary word completions / next-word candidates.
+ * @param spell       Optional spell-check source (Stage 5): for a misspelled composing word it
+ *                    contributes dictionary corrections so a red-underlined word can be fixed by
+ *                    tapping the strip, even when the calibrated autocorrector chose not to fire.
+ *                    Null when no dictionary/spell-checker is available yet.
  */
 internal class CombinedWordSource(
     private val autocorrect: SuggestionSource,
     private val prediction: SuggestionSource,
+    private val spell: SuggestionSource? = null,
 ) : SuggestionSource {
 
     override fun query(ctx: EditingContext, policy: FieldPolicy): List<Suggestion> {
-        // Both sources already honour policy.suggestionsEnabled internally and return empty lists
+        // All sources already honour policy.suggestionsEnabled internally and return empty lists
         // rather than throwing, so no extra gating is needed here.
-        val corrections = autocorrect.query(ctx, policy)
+        val autoCorrections = autocorrect.query(ctx, policy)
+        val spellCorrections = spell?.query(ctx, policy) ?: emptyList()
         val predictions = prediction.query(ctx, policy)
+
+        // Merge the calibrated autocorrector candidate (if any) with the spell-check corrections,
+        // de-duplicating case-insensitively so the same fix never appears twice. The autocorrector's
+        // entry is kept ahead of spell entries because only it carries a confidence used elsewhere.
+        val corrections = ArrayList<Suggestion>(autoCorrections.size + spellCorrections.size)
+        val correctionTexts = HashSet<String>()
+        for (s in autoCorrections) if (correctionTexts.add(s.text.lowercase())) corrections += s
+        for (s in spellCorrections) if (correctionTexts.add(s.text.lowercase())) corrections += s
+
         if (corrections.isEmpty()) return predictions
 
-        // Drop any prediction that duplicates the correction text so the strip does not show the
-        // same word twice (the AUTOCORRECT entry already represents it, with confidence attached).
-        val correctionTexts = corrections.mapTo(HashSet()) { it.text.lowercase() }
+        // Drop any prediction that duplicates a correction so the strip does not show the same word
+        // twice (the correction entry already represents it).
         val dedupedPredictions = predictions.filter { it.text.lowercase() !in correctionTexts }
         return corrections + dedupedPredictions
     }

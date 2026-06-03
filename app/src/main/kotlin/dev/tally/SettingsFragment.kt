@@ -35,6 +35,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
         findPreference<ListPreference>(TallyPreferences.KEY_FORM_FACTOR)
             ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
 
+        // Show the chosen Slow/Normal/Fast and Short/Medium/Long labels as the summary.
+        findPreference<ListPreference>(TallyPreferences.KEY_BACKSPACE_SPEED)
+            ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+
+        findPreference<ListPreference>(TallyPreferences.KEY_LONG_PRESS_DELAY)
+            ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+
+        // Show the chosen Small/Default/Large/Extra-large label as the summary.
+        findPreference<ListPreference>(TallyPreferences.KEY_KEY_FONT_SCALE)
+            ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+
+        // Show the chosen theme label (e.g. "High contrast: white on black") as the summary.
+        findPreference<ListPreference>(TallyPreferences.KEY_THEME_PRESET)
+            ?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+
         findPreference<Preference>("overlay")?.setOnPreferenceClickListener {
             startActivity(Intent(requireContext(), OverlayConsentActivity::class.java))
             true

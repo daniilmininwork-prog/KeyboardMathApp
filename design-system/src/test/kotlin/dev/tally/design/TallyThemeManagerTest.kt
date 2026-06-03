@@ -159,6 +159,108 @@ class TallyThemeManagerTest {
             staticChipBg, theme.chipBg)
     }
 
+    // ── Base variant presets (Stage 4) ────────────────────────────────────────
+
+    @Test
+    fun preset_baseVariant_appliesFullPaletteToRegisteredTheme() {
+        manager.attach(ctx)
+        val theme = KeyTheme(ctx)
+        manager.addKeyTheme(theme)
+
+        manager.preset = ThemePreset.BaseVariant.Dark
+
+        // Every token should now equal the Dark palette, regardless of the system day/night mode.
+        assertEquals(ThemePreset.BaseVariant.Dark.palette.keyBg, theme.keyBg)
+        assertEquals(ThemePreset.BaseVariant.Dark.palette.keyText, theme.keyText)
+        assertEquals(ThemePreset.BaseVariant.Dark.palette.keyboardBg, theme.keyboardBg)
+    }
+
+    @Test
+    fun preset_baseVariant_doesNotDrawBorders() {
+        manager.attach(ctx)
+        val theme = KeyTheme(ctx)
+        manager.addKeyTheme(theme)
+
+        manager.preset = ThemePreset.BaseVariant.Light
+        assertEquals(false, theme.drawKeyBorders)
+    }
+
+    // ── High-contrast presets (Stage 4) ────────────────────────────────────────
+
+    @Test
+    fun preset_highContrast_appliesPaletteAndTurnsOnBorders() {
+        manager.attach(ctx)
+        val theme = KeyTheme(ctx)
+        manager.addKeyTheme(theme)
+
+        manager.preset = ThemePreset.HighContrast.WhiteOnBlack
+
+        assertEquals(ThemePreset.HighContrast.WhiteOnBlack.palette.keyText, theme.keyText)
+        assertEquals(ThemePreset.HighContrast.WhiteOnBlack.palette.keyBorder, theme.keyBorder)
+        assertEquals("High-contrast preset must enable borders", true, theme.drawKeyBorders)
+    }
+
+    @Test
+    fun preset_highContrast_overridesActiveDynamicTheme() {
+        manager.attach(ctx)
+        val theme = KeyTheme(ctx)
+        manager.addKeyTheme(theme)
+
+        // Start on a dynamic accent preset, then switch to high-contrast: the palette must win.
+        manager.preset = ThemePreset.Builtin.Ocean
+        manager.preset = ThemePreset.HighContrast.YellowOnBlack
+
+        assertEquals(ThemePreset.HighContrast.YellowOnBlack.palette.chipBg, theme.chipBg)
+        assertEquals(true, theme.drawKeyBorders)
+    }
+
+    @Test
+    fun preset_switchingFromHighContrastToDynamic_clearsPaletteAndBorders() {
+        manager.attach(ctx)
+        val theme = KeyTheme(ctx)
+        manager.addKeyTheme(theme)
+
+        manager.preset = ThemePreset.HighContrast.WhiteOnBlue
+        assertEquals(true, theme.drawKeyBorders)
+
+        // Moving to a dynamic builtin must clear the palette override (no leftover borders).
+        manager.preset = ThemePreset.Builtin.Ember
+        assertEquals("Border must clear when leaving a high-contrast preset", false, theme.drawKeyBorders)
+    }
+
+    @Test
+    fun addKeyTheme_afterHighContrastSet_appliesPaletteAndBordersImmediately() {
+        manager.attach(ctx)
+        manager.preset = ThemePreset.HighContrast.WhiteOnBlack
+
+        // A view registered after the preset was chosen must match — incl. the border flag.
+        val lateTheme = KeyTheme(ctx)
+        manager.addKeyTheme(lateTheme)
+
+        assertEquals(true, lateTheme.drawKeyBorders)
+        assertEquals(ThemePreset.HighContrast.WhiteOnBlack.palette.keyText, lateTheme.keyText)
+    }
+
+    @Test
+    fun applyCustomImageScheme_clearsActivePalette() {
+        manager.attach(ctx)
+        val theme = KeyTheme(ctx)
+        manager.addKeyTheme(theme)
+
+        manager.preset = ThemePreset.HighContrast.WhiteOnBlack
+        assertEquals(true, theme.drawKeyBorders)
+
+        // A custom image is a dynamic accent and must supersede the high-contrast palette.
+        manager.applyCustomImageScheme(
+            DynamicColorScheme.Scheme(
+                primarySeed   = 0xFF_FF5722.toInt(),
+                secondarySeed = 0xFF_FF5722.toInt(),
+                neutralSeed   = 0xFF_FF5722.toInt(),
+            )
+        )
+        assertEquals("Custom image must clear the high-contrast border", false, theme.drawKeyBorders)
+    }
+
     // ── removeKeyTheme ────────────────────────────────────────────────────────
 
     @Test

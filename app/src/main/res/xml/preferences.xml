@@ -62,6 +62,13 @@
         app:iconSpaceReserved="false" />
 
     <SwitchPreferenceCompat
+        app:key="spell_check_enabled"
+        app:title="@string/pref_spell_check_title"
+        app:summary="@string/pref_spell_check_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
         app:key="auto_space_enabled"
         app:title="@string/pref_auto_space_title"
         app:summary="@string/pref_auto_space_summary"
@@ -80,6 +87,49 @@
         app:title="@string/pref_double_space_period_title"
         app:summary="@string/pref_double_space_period_summary"
         app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        app:key="alt_char_hints_enabled"
+        app:title="@string/pref_alt_char_hints_title"
+        app:summary="@string/pref_alt_char_hints_summary"
+        app:defaultValue="false"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="backspace_speed"
+        app:title="@string/pref_backspace_speed_title"
+        app:summary="%s"
+        app:entries="@array/pref_backspace_speed_entries"
+        app:entryValues="@array/pref_backspace_speed_values"
+        app:defaultValue="NORMAL"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="long_press_delay"
+        app:title="@string/pref_long_press_delay_title"
+        app:summary="%s"
+        app:entries="@array/pref_long_press_delay_entries"
+        app:entryValues="@array/pref_long_press_delay_values"
+        app:defaultValue="MEDIUM"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="key_font_scale"
+        app:title="@string/pref_key_font_scale_title"
+        app:summary="%s"
+        app:entries="@array/pref_key_font_scale_entries"
+        app:entryValues="@array/pref_key_font_scale_values"
+        app:defaultValue="1.0"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="theme_preset"
+        app:title="@string/pref_theme_title"
+        app:summary="%s"
+        app:entries="@array/pref_theme_entries"
+        app:entryValues="@array/pref_theme_values"
+        app:defaultValue="wallpaper"
         app:iconSpaceReserved="false" />
 
     <SwitchPreferenceCompat

@@ -80,6 +80,19 @@ class TallyPreferences(context: Context) {
         set(v) = prefs.edit().putBoolean(KEY_AUTOCORRECT, v).apply()
 
     /**
+     * Whether out-of-dictionary words are flagged with a red spell-check underline (Stage 5).
+     *
+     * On by default, matching the system-keyboard convention. The check is fully on-device —
+     * it consults the same bundled English dictionary used for prediction/autocorrect, so it
+     * works with no network and never transmits typed text. When false the keyboard never draws
+     * the red underline and tapping a word offers no spell corrections. Re-read on field entry so
+     * a toggle made while the keyboard was hidden takes effect on the next focus.
+     */
+    var spellCheckEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SPELL_CHECK, true)
+        set(v) = prefs.edit().putBoolean(KEY_SPELL_CHECK, v).apply()
+
+    /**
      * Whether committing a word from the suggestion strip auto-appends a trailing space.
      *
      * On by default, matching the Gboard convention that tapping a candidate starts the next
@@ -112,6 +125,18 @@ class TallyPreferences(context: Context) {
         set(v) = prefs.edit().putBoolean(KEY_DOUBLE_SPACE_PERIOD, v).apply()
 
     /**
+     * Whether each key's primary long-press alternate is drawn as a small hint glyph in the
+     * key's corner (Samsung/Gboard-style keycap hint).
+     *
+     * Off by default, matching Samsung's stock keyboard, which ships the hint hidden. When true
+     * the first [dev.tally.ime.Key.moreKeys] entry of every key that carries alternates is drawn
+     * faintly in the upper corner so the long-press character is discoverable without holding.
+     */
+    var altCharHints: Boolean
+        get() = prefs.getBoolean(KEY_ALT_CHAR_HINTS, false)
+        set(v) = prefs.edit().putBoolean(KEY_ALT_CHAR_HINTS, v).apply()
+
+    /**
      * The active keyboard theme preset key (matches [dev.tally.design.ThemePreset.key]).
      *
      * Defaults to "wallpaper" so new installs on Android 12+ automatically follow the system
@@ -121,6 +146,45 @@ class TallyPreferences(context: Context) {
     var themePresetKey: String
         get() = prefs.getString(KEY_THEME_PRESET, DEFAULT_THEME_PRESET) ?: DEFAULT_THEME_PRESET
         set(v) = prefs.edit().putString(KEY_THEME_PRESET, v).apply()
+
+    // ── Input timing (Stage 2) ────────────────────────────────────────────────
+
+    /**
+     * Backspace key-repeat speed key (matches [dev.tally.keyboard.engine.BackspaceSpeed.name]).
+     *
+     * Defaults to "NORMAL", which reproduces the previously hardcoded repeat schedule exactly.
+     * Stored as the enum's name (a raw String) for the same reason as [formFactorKey]: this
+     * module does not depend on keyboard-engine, so the IME layer resolves the name to the
+     * enum. Re-read on field entry so a change made while the keyboard was hidden takes effect.
+     */
+    var backspaceSpeedKey: String
+        get() = prefs.getString(KEY_BACKSPACE_SPEED, DEFAULT_BACKSPACE_SPEED) ?: DEFAULT_BACKSPACE_SPEED
+        set(v) = prefs.edit().putString(KEY_BACKSPACE_SPEED, v).apply()
+
+    /**
+     * Touch-and-hold (long-press) delay key (matches
+     * [dev.tally.keyboard.engine.LongPressDelay.name]).
+     *
+     * Defaults to "MEDIUM" (≈400 ms), matching the value that was previously hardcoded in
+     * KeyPlaneView. Stored as the enum's name for the same reason as [backspaceSpeedKey].
+     */
+    var longPressDelayKey: String
+        get() = prefs.getString(KEY_LONG_PRESS_DELAY, DEFAULT_LONG_PRESS_DELAY) ?: DEFAULT_LONG_PRESS_DELAY
+        set(v) = prefs.edit().putString(KEY_LONG_PRESS_DELAY, v).apply()
+
+    /**
+     * Multiplier applied to the on-key glyph size at draw time (Stage 3).
+     *
+     * Defaults to 1.0 (the previously hardcoded sizes). Scaling is purely visual — it changes only
+     * the rendered glyph size, never the key rects or keyboard footprint — so a larger or smaller
+     * font does not shift touch targets. Stored as a string because ListPreference always persists
+     * strings; an unparseable value (e.g. from a backup of a future version) falls back to 1.0.
+     * Re-read on field entry so a change made while the keyboard was hidden takes effect next focus.
+     */
+    var keyFontScale: Float
+        get() = prefs.getString(KEY_KEY_FONT_SCALE, DEFAULT_KEY_FONT_SCALE)
+            ?.toFloatOrNull() ?: DEFAULT_KEY_FONT_SCALE.toFloat()
+        set(v) = prefs.edit().putString(KEY_KEY_FONT_SCALE, v.toString()).apply()
 
     // ── Voice input (T5.2) ───────────────────────────────────────────────────
 
@@ -204,9 +268,11 @@ class TallyPreferences(context: Context) {
         const val KEY_LOCALE_OVERRIDE    = "locale_override"
         const val KEY_NUMBER_ROW         = "number_row_enabled"
         const val KEY_AUTOCORRECT        = "autocorrect_enabled"
+        const val KEY_SPELL_CHECK        = "spell_check_enabled"
         const val KEY_AUTO_SPACE         = "auto_space_enabled"
         const val KEY_AUTO_CAP           = "auto_cap_enabled"
         const val KEY_DOUBLE_SPACE_PERIOD = "double_space_period_enabled"
+        const val KEY_ALT_CHAR_HINTS     = "alt_char_hints_enabled"
         const val KEY_THEME_PRESET       = "theme_preset"
         const val KEY_ACTIVE_SUBTYPE     = "active_subtype"
         const val DEFAULT_SUBTYPE_ID     = "en_US_QWERTY"
@@ -216,5 +282,13 @@ class TallyPreferences(context: Context) {
         const val KEY_FLOATING_OFFSET_Y  = "floating_offset_y"
         const val DEFAULT_FORM_FACTOR    = "NORMAL"
         const val KEY_VOICE_INPUT        = "voice_input_enabled"
+        const val KEY_BACKSPACE_SPEED    = "backspace_speed"
+        const val DEFAULT_BACKSPACE_SPEED = "NORMAL"
+        const val KEY_LONG_PRESS_DELAY   = "long_press_delay"
+        const val DEFAULT_LONG_PRESS_DELAY = "MEDIUM"
+        const val KEY_KEY_FONT_SCALE     = "key_font_scale"
+        // Stored as a string to match ListPreference's string-only persistence; "1.0" reproduces
+        // the previously hardcoded glyph sizes exactly.
+        const val DEFAULT_KEY_FONT_SCALE = "1.0"
     }
 }

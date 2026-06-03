@@ -28,6 +28,7 @@ object DecoderFactory {
             wordPredictor        = WordPredictorImpl(decoder = decoder, freqCache = store.cache),
             autocorrector        = AutocorrectorImpl(decoder = decoder, dictionary = dictionary),
             gestureDecoder       = GestureDecoderImpl(dictionary = dictionary),
+            spellChecker         = SpellChecker(dictionary = dictionary, decoder = decoder),
             personalizationStore = store,
         )
     }
@@ -45,5 +46,6 @@ data class DecoderStack(
     val wordPredictor: WordPredictorImpl,
     val autocorrector: AutocorrectorImpl,
     val gestureDecoder: GestureDecoderImpl,
+    val spellChecker: SpellChecker,
     val personalizationStore: PersonalizationStore,
 )

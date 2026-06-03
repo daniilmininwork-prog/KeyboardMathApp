@@ -97,4 +97,63 @@ class KeyRepeatControllerTest {
         assertTrue(second < 600L)
         assertTrue(second >= 100L)
     }
+
+    // ── Parameterised by BackspaceSpeed (Stage 2) ─────────────────────────────
+
+    /**
+     * NORMAL must reproduce the pre-setting hardcoded schedule exactly so an existing install
+     * deletes at the same pace as before the preference existed.
+     */
+    @Test
+    fun normalSpeed_reproducesLegacyDefaults() {
+        val ctrl = BackspaceSpeed.NORMAL.newController()
+        assertEquals(KeyRepeatController.INITIAL_DELAY_MS, ctrl.initialDelayMs)
+        assertEquals(KeyRepeatController.MIN_INTERVAL_MS, ctrl.minIntervalMs)
+        assertEquals(KeyRepeatController.STEP_FACTOR, ctrl.stepFactor, 0.0)
+        assertEquals(KeyRepeatController.INITIAL_DELAY_MS, ctrl.nextIntervalMs())
+    }
+
+    /** Each speed's controller starts its schedule at that speed's initial delay. */
+    @Test
+    fun eachSpeed_firstIntervalMatchesItsInitialDelay() {
+        BackspaceSpeed.entries.forEach { speed ->
+            val ctrl = speed.newController()
+            assertEquals(
+                speed.initialDelayMs,
+                ctrl.nextIntervalMs(),
+                "First interval for $speed must equal its initialDelayMs",
+            )
+        }
+    }
+
+    /**
+     * Ordering invariant across speeds: SLOW waits longer before the first delete and bottoms
+     * out at a higher floor than NORMAL, which in turn is slower than FAST. This is what makes
+     * the Slow/Normal/Fast labels meaningful.
+     */
+    @Test
+    fun speeds_areOrderedSlowToFast() {
+        val slow   = BackspaceSpeed.SLOW
+        val normal = BackspaceSpeed.NORMAL
+        val fast   = BackspaceSpeed.FAST
+
+        assertTrue(slow.initialDelayMs > normal.initialDelayMs, "SLOW initial delay > NORMAL")
+        assertTrue(normal.initialDelayMs > fast.initialDelayMs, "NORMAL initial delay > FAST")
+
+        assertTrue(slow.minIntervalMs > normal.minIntervalMs, "SLOW floor > NORMAL floor")
+        assertTrue(normal.minIntervalMs > fast.minIntervalMs, "NORMAL floor > FAST floor")
+    }
+
+    /** Every speed still honours the controller contract: floor is reached and held. */
+    @Test
+    fun everySpeed_reachesAndHoldsItsFloor() {
+        BackspaceSpeed.entries.forEach { speed ->
+            val ctrl = speed.newController()
+            repeat(40) { ctrl.nextIntervalMs() }
+            val a = ctrl.nextIntervalMs()
+            val b = ctrl.nextIntervalMs()
+            assertEquals(speed.minIntervalMs, a, "$speed must settle at its floor")
+            assertEquals(a, b, "$speed floor must be constant")
+        }
+    }
 }

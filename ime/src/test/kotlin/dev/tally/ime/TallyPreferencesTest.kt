@@ -199,4 +199,78 @@ class TallyPreferencesTest {
         prefs.doubleSpacePeriod = true
         assertTrue(prefs.doubleSpacePeriod)
     }
+
+    // ── Alt-character keycap hints (Stage 1) ──────────────────────────────────
+
+    @Test
+    fun altCharHints_defaultIsFalse() {
+        assertFalse("alt-char hints must default to off, matching Samsung", prefs.altCharHints)
+    }
+
+    @Test
+    fun altCharHints_roundtrip() {
+        prefs.altCharHints = true
+        assertTrue(prefs.altCharHints)
+        prefs.altCharHints = false
+        assertFalse(prefs.altCharHints)
+    }
+
+    // ── Input timing (Stage 2) ────────────────────────────────────────────────
+
+    @Test
+    fun backspaceSpeedKey_defaultIsNormal() {
+        assertEquals(TallyPreferences.DEFAULT_BACKSPACE_SPEED, prefs.backspaceSpeedKey)
+    }
+
+    @Test
+    fun backspaceSpeedKey_roundtrip() {
+        prefs.backspaceSpeedKey = "SLOW"
+        assertEquals("SLOW", prefs.backspaceSpeedKey)
+        prefs.backspaceSpeedKey = "FAST"
+        assertEquals("FAST", prefs.backspaceSpeedKey)
+        prefs.backspaceSpeedKey = "NORMAL"
+        assertEquals("NORMAL", prefs.backspaceSpeedKey)
+    }
+
+    @Test
+    fun longPressDelayKey_defaultIsMedium() {
+        assertEquals(TallyPreferences.DEFAULT_LONG_PRESS_DELAY, prefs.longPressDelayKey)
+    }
+
+    @Test
+    fun longPressDelayKey_roundtrip() {
+        prefs.longPressDelayKey = "SHORT"
+        assertEquals("SHORT", prefs.longPressDelayKey)
+        prefs.longPressDelayKey = "LONG"
+        assertEquals("LONG", prefs.longPressDelayKey)
+        prefs.longPressDelayKey = "MEDIUM"
+        assertEquals("MEDIUM", prefs.longPressDelayKey)
+    }
+
+    // ── Key font scale (Stage 3) ──────────────────────────────────────────────
+
+    @Test
+    fun keyFontScale_defaultIsOne() {
+        assertEquals("key font scale must default to 1.0", 1.0f, prefs.keyFontScale, 0f)
+    }
+
+    @Test
+    fun keyFontScale_roundtrip() {
+        prefs.keyFontScale = 0.85f
+        assertEquals(0.85f, prefs.keyFontScale, 1e-6f)
+        prefs.keyFontScale = 1.3f
+        assertEquals(1.3f, prefs.keyFontScale, 1e-6f)
+        prefs.keyFontScale = 1.0f
+        assertEquals(1.0f, prefs.keyFontScale, 1e-6f)
+    }
+
+    /**
+     * A backup restore (or manual edit) could write a non-numeric value to the string-backed
+     * key. The getter must fall back to 1.0 rather than crashing.
+     */
+    @Test
+    fun keyFontScale_unparseableStoredValue_fallsBackToOne() {
+        sharedPrefs.edit().putString(TallyPreferences.KEY_KEY_FONT_SCALE, "not-a-number").commit()
+        assertEquals(1.0f, prefs.keyFontScale, 0f)
+    }
 }

@@ -30,6 +30,17 @@ internal class ComposingTextManager(
     private val mirror: InputConnectionMirror,
 ) {
 
+    /**
+     * Styles the composing-region text before it is sent to the editor (Stage 5).
+     *
+     * Defaults to identity so the composing word is committed as plain text — exactly the
+     * pre-spell-check behaviour. [KeyboardController] installs a decorator that wraps an
+     * out-of-dictionary word with a red [SpellUnderline] span; the decorator is consulted on every
+     * [setComposingText] so the underline appears and disappears live as the word changes under
+     * backspace/typing. It returns the input unchanged for known words and when spell-check is off.
+     */
+    var composingDecorator: (CharSequence) -> CharSequence = { it }
+
     /** The text currently in the composing region, not yet committed. */
     private val composingBuffer = StringBuilder()
 
@@ -54,7 +65,11 @@ internal class ComposingTextManager(
         if (ic == null) return
         composingBuffer.append(ch)
         withBatchEdit(ic) {
-            if (!ic.setComposingText(composingBuffer.toString(), 1)) {
+            // Decorate so an out-of-dictionary word gets a live red spell-check underline; known
+            // words pass through unchanged. The decorator owns both the spell lookup and the
+            // enabled-preference gate, so this call site stays agnostic to spell-check policy.
+            val styled = composingDecorator(composingBuffer.toString())
+            if (!ic.setComposingText(styled, 1)) {
                 Log.w(TAG, "setComposingText returned false — IC may be invalidated")
             }
         }
@@ -244,7 +259,11 @@ internal class ComposingTextManager(
                         Log.w(TAG, "deleteCodePointsBefore/finishComposingText returned false")
                     }
                 } else {
-                    if (!ic.setComposingText(composingBuffer.toString(), 1)) {
+                    // Re-decorate after the deletion: shortening the word may turn an unknown word
+                    // into a known prefix (clears the underline) or vice-versa, so the red flag
+                    // tracks the live buffer rather than going stale on backspace.
+                    val styled = composingDecorator(composingBuffer.toString())
+                    if (!ic.setComposingText(styled, 1)) {
                         Log.w(TAG, "deleteCodePointsBefore/setComposingText returned false")
                     }
                 }

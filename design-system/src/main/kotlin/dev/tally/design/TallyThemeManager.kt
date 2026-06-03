@@ -41,8 +41,7 @@ class TallyThemeManager {
     var preset: ThemePreset = ThemePreset.Wallpaper
         set(value) {
             field = value
-            pendingScheme = resolveSchemeForPreset(value, lastWallpaperScheme)
-            broadcast(pendingScheme)
+            applyResolved(value)
         }
 
     /** The most recently resolved wallpaper scheme; cached so preset switches can reference it. */
@@ -50,6 +49,13 @@ class TallyThemeManager {
 
     /** The scheme currently applied to all registered [KeyTheme]s. */
     private var pendingScheme: DynamicColorScheme.Scheme? = null
+
+    /**
+     * The full-palette override currently applied to all registered [KeyTheme]s, or null when the
+     * active preset uses the dynamic-scheme / static-token path. A palette (base variant or
+     * high-contrast) takes total priority over [pendingScheme] — see [KeyTheme.applyPalette].
+     */
+    private var pendingPalette: KeyPalette? = null
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -76,8 +82,7 @@ class TallyThemeManager {
                 )
             }
             if (preset == ThemePreset.Wallpaper) {
-                pendingScheme = lastWallpaperScheme
-                broadcast(pendingScheme)
+                applyResolved(preset)
             }
         }
         colorsListener = listener
@@ -87,8 +92,7 @@ class TallyThemeManager {
 
         // Resolve the current wallpaper palette immediately.
         lastWallpaperScheme = DynamicColorScheme.resolve(context)
-        pendingScheme = resolveSchemeForPreset(preset, lastWallpaperScheme)
-        broadcast(pendingScheme)
+        applyResolved(preset)
     }
 
     /** Unregisters the wallpaper listener. Call from the IME's destroy/detach path. */
@@ -113,6 +117,9 @@ class TallyThemeManager {
         if (keyTheme !in keyThemes) {
             keyThemes += keyTheme
         }
+        // Apply the full current state (palette wins over scheme) so a late-registered view matches
+        // the others immediately, including any active high-contrast border.
+        keyTheme.applyPalette(pendingPalette)
         keyTheme.applyDynamicColors(pendingScheme)
     }
 
@@ -137,29 +144,58 @@ class TallyThemeManager {
         // A custom image takes priority over the wallpaper preset but the ThemePreset enum does
         // not have a "Custom" entry — instead we update pendingScheme directly and leave preset
         // unchanged. The next preset assignment will overwrite this, which is the right behavior
-        // (user explicitly chooses a preset → their image choice is superseded).
+        // (user explicitly chooses a preset → their image choice is superseded). A custom image is
+        // a dynamic accent, so it also clears any active full-palette override.
+        pendingPalette = null
         pendingScheme = scheme
-        broadcast(pendingScheme)
+        broadcast()
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
 
-    private fun resolveSchemeForPreset(
-        preset: ThemePreset,
-        wallpaperScheme: DynamicColorScheme.Scheme?,
-    ): DynamicColorScheme.Scheme? = when (preset) {
-        ThemePreset.Wallpaper      -> wallpaperScheme
-        ThemePreset.Static         -> null
-        is ThemePreset.Builtin     -> DynamicColorScheme.Scheme(
-            primarySeed   = preset.seed,
-            secondarySeed = preset.seed,   // builtin presets use the same seed for all three
-            neutralSeed   = preset.seed,
-        )
+    /**
+     * Resolves [preset] into the pending palette + scheme and fans the result out. A preset
+     * resolves to EITHER a full [KeyPalette] (base variants, high-contrast) or a
+     * [DynamicColorScheme.Scheme] (wallpaper, builtin) — never both — so exactly one of the two
+     * pending fields is non-null after this call. [ThemePreset.Static] resolves to neither, which
+     * means "static day/night resource tokens".
+     */
+    private fun applyResolved(preset: ThemePreset) {
+        when (preset) {
+            ThemePreset.Wallpaper -> {
+                pendingPalette = null
+                pendingScheme  = lastWallpaperScheme
+            }
+            ThemePreset.Static -> {
+                pendingPalette = null
+                pendingScheme  = null
+            }
+            is ThemePreset.BaseVariant -> {
+                pendingPalette = preset.palette
+                pendingScheme  = null
+            }
+            is ThemePreset.HighContrast -> {
+                pendingPalette = preset.palette
+                pendingScheme  = null
+            }
+            is ThemePreset.Builtin -> {
+                pendingPalette = null
+                pendingScheme  = DynamicColorScheme.Scheme(
+                    primarySeed   = preset.seed,
+                    secondarySeed = preset.seed,   // builtin presets use the same seed for all three
+                    neutralSeed   = preset.seed,
+                )
+            }
+        }
+        broadcast()
     }
 
-    private fun broadcast(scheme: DynamicColorScheme.Scheme?) {
+    // Pushes the current palette + scheme to every registered theme. Order matters only in that
+    // both are always set so a theme never keeps stale state from a previous preset.
+    private fun broadcast() {
         for (theme in keyThemes) {
-            theme.applyDynamicColors(scheme)
+            theme.applyPalette(pendingPalette)
+            theme.applyDynamicColors(pendingScheme)
         }
     }
 }

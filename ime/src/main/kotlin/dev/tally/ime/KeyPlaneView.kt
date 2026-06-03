@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.core.view.ViewCompat
 import dev.tally.keyboard.engine.CursorController
+import dev.tally.keyboard.engine.BackspaceSpeed
 import dev.tally.keyboard.engine.FormFactorMode
 import dev.tally.keyboard.engine.FormFactorTransform
 import dev.tally.keyboard.engine.KeyDef
@@ -19,6 +20,7 @@ import dev.tally.keyboard.engine.KeyGeometry
 import dev.tally.keyboard.engine.KeyId
 import dev.tally.keyboard.engine.KeyRepeatController
 import dev.tally.keyboard.engine.KeyboardHeightPolicy
+import dev.tally.keyboard.engine.LongPressDelay
 import dev.tally.keyboard.engine.PointerTrackerPool
 import dev.tally.keyboard.engine.ResolvedKey
 import dev.tally.keyboard.engine.SpecialCode
@@ -40,7 +42,7 @@ import dev.tally.keyboard.engine.SpecialCode
  * entirely when [previewMasked] is true (password and other masked input fields).
  *
  * Long-press alternates (T1.4): when a key with [Key.moreKeys] is held beyond
- * [LONG_PRESS_DELAY_MS], the key-preview is replaced by a [LongPressPopup] mini-keyboard.
+ * [longPressDelayMs], the key-preview is replaced by a [LongPressPopup] mini-keyboard.
  * Subsequent MOVE events route to the popup for cell selection; UP commits the highlighted
  * alternate (or the primary key if no cell is highlighted). Normal key commit on UP is
  * suppressed once a long-press tray has fired.
@@ -237,6 +239,40 @@ internal class KeyPlaneView @JvmOverloads constructor(
      */
     var previewMasked: Boolean = false
 
+    /**
+     * Whether each key's primary long-press alternate is drawn as a small hint glyph in the
+     * key's upper corner, like the Samsung/Gboard keycap hints.
+     *
+     * Set from [TallyPreferences.altCharHints] in [TallyInputMethodService.onStartInputView],
+     * which runs on every field entry — so a toggle made while the keyboard was hidden takes
+     * effect on the next focus without a service restart. Defaults to false to match Samsung's
+     * stock keyboard, which ships the hint hidden. A change requests a redraw so the hints
+     * appear/disappear on the next frame without rebuilding the view.
+     */
+    var altCharHints: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /**
+     * Multiplier applied to the on-key glyph sizes at draw time (Stage 3).
+     *
+     * Set from [TallyPreferences.keyFontScale] in [TallyInputMethodService.onStartInputView] so a
+     * change made while the keyboard was hidden takes effect on the next focus without a service
+     * restart. Applied to the text paints inside [onDraw] only — the key rects and overall
+     * footprint ([buildGeometry]) are unaffected, so touch targets never move with the font size.
+     * Defaults to 1.0, which reproduces the historical hardcoded sizes exactly. A change requests a
+     * redraw so the new size appears on the next frame without rebuilding the view.
+     */
+    var keyFontScale: Float = 1f
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     private val pool = PointerTrackerPool()
 
     // Pixel threshold for the swipe-left-on-delete word-delete gesture, derived from
@@ -270,6 +306,16 @@ internal class KeyPlaneView @JvmOverloads constructor(
     private val textPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
     }
+    // Alt-character hint glyph: a smaller, dimmed copy of the key-text colour drawn in the corner.
+    // Colour and size are refreshed per-frame in onDraw so a theme/text-size change is reflected
+    // without recreating the view. End-aligned so it sits flush in the upper-trailing corner.
+    private val hintPaint       = Paint(Paint.ANTI_ALIAS_FLAG)
+    // Per-key border stroke, drawn only when the active theme requests it (high-contrast presets).
+    // Stroke width is fixed in dp so the outline reads at any density; colour is refreshed per-frame.
+    private val borderPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dpToPx(1.5f)
+    }
 
     // KeyIds with a finger currently down on them. Populated on ACTION_DOWN / ACTION_POINTER_DOWN
     // and drained on UP / POINTER_UP / CANCEL; onDraw paints these with a pressed tint so a held
@@ -297,6 +343,10 @@ internal class KeyPlaneView @JvmOverloads constructor(
     private val cornerRadius      = dpToPx(10f)
     private val keyTextSizePx     = spToPx(18f)
     private val specialTextSizePx = spToPx(14f)
+    // Corner hint glyph size: ~0.55× the main label, matching the small keycap hints on Samsung/Gboard.
+    private val hintTextSizePx    = keyTextSizePx * HINT_TEXT_SCALE
+    // Padding from the key face's drawn edge to the hint glyph, so it never touches the rounded corner.
+    private val hintInsetPx       = dpToPx(3f)
 
     // One preview popup per pointer slot. The map is keyed by pointerId so
     // simultaneous presses each get their own bubble.
@@ -320,8 +370,35 @@ internal class KeyPlaneView @JvmOverloads constructor(
 
     // ── Backspace repeat + swipe-left (T1.9) ──────────────────────────────────
 
-    // Schedule that produces each repeat interval.
-    private val repeatController = KeyRepeatController()
+    // Schedule that produces each repeat interval. Reassigned (not mutated) when the user
+    // changes the backspace-speed preference so the next press picks up the new timing; a fresh
+    // controller also starts the accelerate schedule cleanly from the new initial delay.
+    private var repeatController = KeyRepeatController()
+
+    /**
+     * Backspace key-repeat speed. Set by [TallyInputMethodService] from
+     * [TallyPreferences.backspaceSpeedKey] on each [onStartInputView] so a settings change made
+     * while the keyboard was hidden takes effect on the next field focus.
+     *
+     * Assigning rebuilds [repeatController] with the speed's initial-delay / step / floor; a
+     * press already in flight keeps the controller it started with (the rebuild only affects the
+     * next [armBackspaceRepeat]).
+     */
+    var backspaceSpeed: BackspaceSpeed = BackspaceSpeed.DEFAULT
+        set(value) {
+            if (field != value) {
+                field = value
+                repeatController = value.newController()
+            }
+        }
+
+    /**
+     * Touch-and-hold delay before a key's long-press alternate tray fires. Set by
+     * [TallyInputMethodService] from [TallyPreferences.longPressDelayKey] on each
+     * [onStartInputView]. Read at arm time in [armLongPress], so a change applies to the next
+     * press without recreating the view.
+     */
+    var longPressDelayMs: Long = LongPressDelay.DEFAULT.delayMs
 
     // Runnable that fires one repeat tick and re-arms itself.
     private var repeatRunnable: Runnable? = null
@@ -388,6 +465,17 @@ internal class KeyPlaneView @JvmOverloads constructor(
         // (light theme) or lightens (dark theme) toward its own glyph colour, staying on-theme for
         // either palette. Derived per-frame so a light↔dark switch is reflected without a recreate.
         pressedPaint.color    = blendTint(theme.keyBg, theme.keyText, PRESSED_TINT_FRACTION)
+        // Hint glyph: key-text colour at reduced alpha so the alternate reads as secondary, never
+        // competing with the main label. Refreshed here so a light↔dark switch recolours it too.
+        hintPaint.color = theme.keyText
+        hintPaint.alpha = HINT_ALPHA
+        // Scale the hint glyph by the same user font-scale as the main labels so the keycap hint
+        // stays proportional. Applied here (draw time) so the key rects are untouched.
+        hintPaint.textSize = hintTextSizePx * keyFontScale
+        // High-contrast themes outline each key for legibility; refreshed per-frame so a theme
+        // change (incl. toggling a high-contrast preset) is reflected without recreating the view.
+        val drawBorders = theme.drawKeyBorders
+        borderPaint.color = theme.keyBorder
 
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
@@ -442,13 +530,61 @@ internal class KeyPlaneView @JvmOverloads constructor(
                 canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, paint)
             }
 
+            // High-contrast border: stroke the inset face outline so every key reads as a distinct
+            // shape against the background. Drawn over the resting/pressed fill but under the label.
+            // The stroke is inset by half its width so the outline stays inside the face rect and
+            // does not visually merge with the neighbouring key's border across the gap.
+            if (drawBorders) {
+                val inset = borderPaint.strokeWidth / 2f
+                canvas.drawRoundRect(
+                    left + inset, top + inset, right - inset, bottom - inset,
+                    cornerRadius, cornerRadius, borderPaint,
+                )
+            }
+
             // Skip the Space label (it stays blank, per the reference) and any code-only key.
             if (keyDef.code != SpecialCode.SPACE && keyDef.label.isNotEmpty()) {
-                textPaint.textSize = if (keyDef.isSpecial) specialTextSizePx else keyTextSizePx
+                // Apply the user font-scale at draw time only: the base sp size is multiplied here so
+                // the glyph grows/shrinks while the key rect (and therefore the touch target) is
+                // unchanged. specialTextSizePx covers the smaller labels on special keys.
+                textPaint.textSize = (if (keyDef.isSpecial) specialTextSizePx else keyTextSizePx) * keyFontScale
                 val textY = resolvedKey.centerY - (textPaint.ascent() + textPaint.descent()) / 2f
                 canvas.drawText(keyDef.label, resolvedKey.centerX, textY, textPaint)
             }
+
+            // Alt-character keycap hint: when enabled, draw the primary long-press alternate as a
+            // small dimmed glyph in the upper corner so the long-press char is discoverable without
+            // holding (Samsung/Gboard parity). Drawn last so it sits above the face; clipped to the
+            // inset face so it never spills past the rounded edge or overlaps a neighbour.
+            if (altCharHints && keyDef.moreKeys.isNotEmpty()) {
+                drawAltHint(canvas, keyDef.moreKeys.first(), left, top, right)
+            }
         }
+    }
+
+    /**
+     * Draws [glyph] as a small dimmed hint in the upper corner of a key face bounded by
+     * [faceLeft]/[faceTop]/[faceRight] (the gap-inset drawn face, not the full hit rect).
+     *
+     * The corner is upper-trailing in LTR (right) and upper-leading in RTL (left), matching the
+     * physical position the long-press tray opens toward. The glyph is clipped to the face rect so
+     * a wide alternate can never bleed past the rounded edge into the neighbouring key.
+     */
+    private fun drawAltHint(canvas: Canvas, glyph: String, faceLeft: Float, faceTop: Float, faceRight: Float) {
+        val isRtl = layoutDirection == LAYOUT_DIRECTION_RTL
+        if (isRtl) {
+            hintPaint.textAlign = Paint.Align.LEFT
+        } else {
+            hintPaint.textAlign = Paint.Align.RIGHT
+        }
+        val x = if (isRtl) faceLeft + hintInsetPx else faceRight - hintInsetPx
+        // Baseline just below the face top, offset by the glyph ascent so the cap sits inside the face.
+        val y = faceTop + hintInsetPx - hintPaint.ascent()
+
+        val saved = canvas.save()
+        canvas.clipRect(faceLeft, faceTop, faceRight, faceTop + (y - faceTop) + hintPaint.descent())
+        canvas.drawText(glyph, x, y, hintPaint)
+        canvas.restoreToCount(saved)
     }
 
     // ── Touch dispatch ────────────────────────────────────────────────────────
@@ -776,7 +912,7 @@ internal class KeyPlaneView @JvmOverloads constructor(
             lpp.show(resolved, this, key.moreKeys)
         }
         pendingLongPress[pointerId] = r
-        handler.postDelayed(r, LONG_PRESS_DELAY_MS)
+        handler.postDelayed(r, longPressDelayMs)
     }
 
     private fun cancelPendingLongPress(pointerId: Int) {
@@ -914,6 +1050,18 @@ internal class KeyPlaneView @JvmOverloads constructor(
         longPressPopups[pointerId]?.isShowing == true
 
     /**
+     * Returns true once the long-press timer has fired for [pointerId] — i.e. the configured
+     * touch-and-hold delay elapsed and the tray was triggered — regardless of whether the
+     * [LongPressPopup]'s window has finished mapping. Exposed for test assertions only.
+     *
+     * This is the state the touch-and-hold delay preference actually governs, so on-device
+     * timing tests can assert the threshold without depending on PopupWindow window-token
+     * timing (which is irrelevant to the delay and flaky to observe on the emulator).
+     */
+    internal fun isLongPressActive(pointerId: Int): Boolean =
+        pointerId in longPressActive
+
+    /**
      * Returns the currently highlighted alternate index in the long-press tray, or -1.
      * Exposed for test assertions only.
      */
@@ -942,10 +1090,6 @@ internal class KeyPlaneView @JvmOverloads constructor(
         // the same factor makes dark-theme backgrounds slightly lighter via the complementary path.
         const val SPLIT_GAP_DIM_FACTOR = 0.80f
 
-        // Standard long-press interval for keyboard key alternates. Android's own ViewConfiguration
-        // uses 400 ms for long-press; matching that provides a consistent feel.
-        const val LONG_PRESS_DELAY_MS = 400L
-
         // Minimum leftward pixel travel required to trigger the swipe-left word-delete gesture
         // on the backspace key. 40 dp at 2× density = 80 px; the constant is in raw pixels so
         // the view's initialiser can scale it from its display metrics once, below.
@@ -958,5 +1102,13 @@ internal class KeyPlaneView @JvmOverloads constructor(
         // Fraction of the key-text colour blended into the key background for the pressed tint.
         // ~20% is enough to be clearly visible as a press without obscuring the key label.
         const val PRESSED_TINT_FRACTION = 0.20f
+
+        // Corner hint glyph size relative to the main key-text size. ~0.55× matches the small
+        // keycap hints on Samsung/Gboard — legible but clearly secondary to the main label.
+        const val HINT_TEXT_SCALE = 0.55f
+
+        // Alpha (0–255) of the hint glyph. ~40% keeps it faint so the eye reads the main label
+        // first; the hint is a discoverability aid, not a primary character.
+        const val HINT_ALPHA = 102
     }
 }

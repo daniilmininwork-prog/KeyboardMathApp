@@ -20,12 +20,20 @@
     <string name="pref_number_row_summary">Show a dedicated number row above the letter keys</string>
     <string name="pref_autocorrect_title">Autocorrect</string>
     <string name="pref_autocorrect_summary">Fix likely typos automatically when you press space</string>
+    <string name="pref_spell_check_title">Spell check</string>
+    <string name="pref_spell_check_summary">Underline misspelled words in red; tap one to fix it (on-device, no network)</string>
     <string name="pref_auto_space_title">Auto-space after suggestions</string>
     <string name="pref_auto_space_summary">Add a space automatically after tapping a suggestion</string>
     <string name="pref_auto_cap_title">Auto-capitalisation</string>
     <string name="pref_auto_cap_summary">Capitalise the first letter of each sentence automatically</string>
     <string name="pref_double_space_period_title">Double-space inserts period</string>
     <string name="pref_double_space_period_summary">Tap the space bar twice to add a full stop and a space</string>
+    <string name="pref_alt_char_hints_title">Alternate character hints</string>
+    <string name="pref_alt_char_hints_summary">Show each key\'s long-press character as a small hint in the corner</string>
+    <string name="pref_backspace_speed_title">Backspace speed</string>
+    <string name="pref_long_press_delay_title">Touch and hold delay</string>
+    <string name="pref_key_font_scale_title">Key text size</string>
+    <string name="pref_theme_title">Keyboard theme</string>
     <string name="pref_insert_exact_title">Insert exact value</string>
     <string name="pref_insert_exact_summary">Replace the expression with the full-precision decimal instead of the formatted result</string>
     <string name="pref_locale_title">Locale override</string>
@@ -121,5 +129,83 @@
     <string-array name="pref_percent_mode_values">
         <item>ADDITIVE</item>
         <item>DIRECT</item>
+    </string-array>
+
+    <!-- Input timing (Stage 2): backspace repeat speed -->
+    <string-array name="pref_backspace_speed_entries">
+        <item>Slow</item>
+        <item>Normal</item>
+        <item>Fast</item>
+    </string-array>
+    <string-array name="pref_backspace_speed_values">
+        <item>SLOW</item>
+        <item>NORMAL</item>
+        <item>FAST</item>
+    </string-array>
+
+    <!-- Input timing (Stage 2): touch-and-hold (long-press) delay -->
+    <string-array name="pref_long_press_delay_entries">
+        <item>Short</item>
+        <item>Medium</item>
+        <item>Long</item>
+    </string-array>
+    <string-array name="pref_long_press_delay_values">
+        <item>SHORT</item>
+        <item>MEDIUM</item>
+        <item>LONG</item>
+    </string-array>
+
+    <!-- Key font size (Stage 3): glyph scale applied at draw time; key footprint is unchanged. -->
+    <string-array name="pref_key_font_scale_entries">
+        <item>Small</item>
+        <item>Default</item>
+        <item>Large</item>
+        <item>Extra large</item>
+    </string-array>
+    <string-array name="pref_key_font_scale_values">
+        <item>0.85</item>
+        <item>1.0</item>
+        <item>1.15</item>
+        <item>1.3</item>
+    </string-array>
+
+    <!--
+      Keyboard theme (Stage 4). Entry values MUST match dev.tally.design.ThemePreset.key exactly;
+      ThemePreset.fromKey() falls back to Wallpaper for any unrecognised value. The high-contrast
+      entries override the active dynamic/preset theme and draw key borders for legibility.
+    -->
+    <string-array name="pref_theme_entries">
+        <item>Dynamic (wallpaper)</item>
+        <item>System light/dark</item>
+        <item>Light</item>
+        <item>Solid light</item>
+        <item>Dark</item>
+        <item>Solid dark</item>
+        <item>Ocean</item>
+        <item>Forest</item>
+        <item>Ember</item>
+        <item>Dusk</item>
+        <item>Slate</item>
+        <item>High contrast: white on black</item>
+        <item>High contrast: yellow on black</item>
+        <item>High contrast: white on blue</item>
+        <item>High contrast: black on white</item>
+    </string-array>
+    <string-array name="pref_theme_values">
+        <item>wallpaper</item>
+        <item>static</item>
+        <item>light</item>
+        <item>solid_light</item>
+        <item>dark</item>
+        <item>solid_dark</item>
+        <item>ocean</item>
+        <item>forest</item>
+        <item>ember</item>
+        <item>dusk</item>
+        <item>slate</item>
+        <item>hc_white_on_black</item>
+        <item>hc_yellow_on_black</item>
+        <item>hc_white_on_blue</item>
+        <item>hc_black_on_white</item>
     </string-array>
 </resources>

@@ -45,6 +45,12 @@ class KeyTheme(private val context: Context) {
     @ColorInt private var dynamicChipBg: Int? = null
     @ColorInt private var dynamicKeyPressedBg: Int? = null
 
+    // Optional full-palette override injected via applyPalette(). When non-null it wins over BOTH
+    // the static resource tokens and the dynamic scheme for every token, and is the only source of
+    // the per-key border. Used by the explicit Light/Dark base variants and the high-contrast
+    // presets, which must look identical regardless of the system day/night qualifier.
+    private var palette: KeyPalette? = null
+
     // ── Dynamic color injection ───────────────────────────────────────────────
 
     /**
@@ -55,6 +61,11 @@ class KeyTheme(private val context: Context) {
      * neutral surfaces (keyboard background, key background, strip) are unaffected.
      *
      * Pass null to reset to static tokens (e.g. when dynamic color becomes unavailable).
+     *
+     * A scheme does NOT clear an active [applyPalette] override — a full palette is the stronger
+     * signal (the user explicitly forced a fixed/high-contrast look) and stays in force until it is
+     * cleared with `applyPalette(null)`. Callers that switch from a palette preset to a dynamic
+     * preset must clear the palette first; [TallyThemeManager] does this for us.
      *
      * Must be called on the main thread. The change takes effect on the next [onDraw] pass in
      * any view that reads these tokens there.
@@ -71,61 +82,94 @@ class KeyTheme(private val context: Context) {
         dynamicKeyPressedBg = blendWithAlpha(scheme.primarySeed, alpha = 0x66)
     }
 
+    /**
+     * Applies a full [KeyPalette] override (or null to clear it).
+     *
+     * While a palette is set, every token below returns the palette value and [drawKeyBorders]
+     * reflects the palette's border flag, ignoring both the static day/night resources and any
+     * dynamic scheme. This is how the explicit base variants pin a brightness and how the
+     * high-contrast presets force a legible, bordered look that overrides the active theme.
+     *
+     * Pass null to revert to the dynamic-scheme / static-resource behaviour.
+     *
+     * Must be called on the main thread; takes effect on the next [onDraw].
+     */
+    fun applyPalette(palette: KeyPalette?) {
+        this.palette = palette
+    }
+
+    /**
+     * Whether views should stroke a border around each key face.
+     *
+     * True only while a high-contrast (border-on) [KeyPalette] is active; the border colour is then
+     * [keyBorder]. Base variants and the dynamic/static paths leave this false (flat faces).
+     */
+    val drawKeyBorders: Boolean
+        get() = palette?.drawBorder == true
+
+    /**
+     * Stroke colour for the per-key border. Only meaningful when [drawKeyBorders] is true; falls
+     * back to [keyText] so a reader that ignores the flag still gets an on-theme colour.
+     */
+    @get:ColorInt
+    val keyBorder: Int
+        get() = palette?.keyBorder ?: keyText
+
     // ── Keyboard background ───────────────────────────────────────────────────
 
     @get:ColorInt
     val keyboardBg: Int
-        get() = context.getColor(R.color.ds_keyboard_bg)
+        get() = palette?.keyboardBg ?: context.getColor(R.color.ds_keyboard_bg)
 
     // ── Key face ──────────────────────────────────────────────────────────────
 
     @get:ColorInt
     val keyBg: Int
-        get() = context.getColor(R.color.ds_key_bg)
+        get() = palette?.keyBg ?: context.getColor(R.color.ds_key_bg)
 
     @get:ColorInt
     val keySpecialBg: Int
-        get() = context.getColor(R.color.ds_key_special_bg)
+        get() = palette?.keySpecialBg ?: context.getColor(R.color.ds_key_special_bg)
 
     @get:ColorInt
     val keyPressedBg: Int
-        get() = dynamicKeyPressedBg ?: context.getColor(R.color.ds_key_pressed_bg)
+        get() = palette?.keyPressedBg ?: dynamicKeyPressedBg ?: context.getColor(R.color.ds_key_pressed_bg)
 
     @get:ColorInt
     val keyText: Int
-        get() = context.getColor(R.color.ds_key_text)
+        get() = palette?.keyText ?: context.getColor(R.color.ds_key_text)
 
     // ── Suggestion strip ──────────────────────────────────────────────────────
 
     @get:ColorInt
     val suggestionStripBg: Int
-        get() = context.getColor(R.color.ds_suggestion_strip_bg)
+        get() = palette?.suggestionStripBg ?: context.getColor(R.color.ds_suggestion_strip_bg)
 
     // ── Chip ──────────────────────────────────────────────────────────────────
 
     @get:ColorInt
     val chipBg: Int
-        get() = dynamicChipBg ?: context.getColor(R.color.ds_chip_bg)
+        get() = palette?.chipBg ?: dynamicChipBg ?: context.getColor(R.color.ds_chip_bg)
 
     @get:ColorInt
     val chipText: Int
-        get() = context.getColor(R.color.ds_chip_text)
+        get() = palette?.chipText ?: context.getColor(R.color.ds_chip_text)
 
     // ── Key-preview popup ─────────────────────────────────────────────────────
 
     @get:ColorInt
     val keyPreviewBg: Int
-        get() = context.getColor(R.color.ds_key_preview_bg)
+        get() = palette?.keyPreviewBg ?: context.getColor(R.color.ds_key_preview_bg)
 
     // ── Long-press alternate tray ─────────────────────────────────────────────
 
     @get:ColorInt
     val longPressPopupBg: Int
-        get() = context.getColor(R.color.ds_long_press_popup_bg)
+        get() = palette?.longPressPopupBg ?: context.getColor(R.color.ds_long_press_popup_bg)
 
     @get:ColorInt
     val longPressPopupSelectedBg: Int
-        get() = context.getColor(R.color.ds_long_press_popup_selected_bg)
+        get() = palette?.longPressPopupSelectedBg ?: context.getColor(R.color.ds_long_press_popup_selected_bg)
 
     // ── Private helpers ───────────────────────────────────────────────────────
 

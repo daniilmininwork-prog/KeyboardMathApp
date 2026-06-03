@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Test-only manifest for :ime instrumentation tests.
+
+  Declares a bare host Activity so a KeyPlaneView can be attached to a real window during
+  on-device timing tests. A real window is required because the long-press tray is a
+  PopupWindow, and PopupWindow.showAtLocation needs a live window token to report isShowing.
+  Nothing here ships in any app build — it exists only in the androidTest APK.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="dev.tally.ime.KeyPlaneTestActivity"
+            android:exported="false" />
+    </application>
+</manifest>
