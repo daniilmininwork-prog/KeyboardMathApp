@@ -11,6 +11,35 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.1] — 2026-07-05
+
+### Fixed
+
+- **Tally: Calculate showed nothing from Chrome and other read-only hosts.** The result
+  Toast was killed with the finishing activity's process before it rendered ("Toast
+  already killed" on API 35), so answers were computed and never shown. Read-only and
+  error results now render on a small dismissible card (expression, large result, Copy
+  action; dark-mode aware). The editable in-place replacement path is unchanged.
+- Debug typing harness could not exercise Tally: Calculate at all: the app declared no
+  `<queries>` for `ACTION_PROCESS_TEXT` (Android 11+ package visibility) and the
+  harness field had no view id, which makes `TextView.canProcessText()` refuse every
+  process-text action. Both fixed; the selection toolbar now offers the entry and the
+  end-to-end replacement is verified on the API 35 emulator.
+- Dependency verification: added the missing `junit-bom` 5.9.2 `.module` and
+  `guava-parent` 33.3.1-jre `.pom` checksums (each cross-checked against
+  repo1.maven.org) that failed every configuration-time resolve.
+
+### Changed
+
+- Overlay chip anchors to the cursor line (centred on the caret, measured and clamped
+  on-screen) instead of floating over the whole field; tapping anywhere outside the
+  chip dismisses it without stealing focus from the field.
+- Separate `overlayEnabled` master switch so the standalone overlay app and the IME's
+  math suggestions toggle independently.
+- `:process-text` and `:overlay-app` registered as standalone modules.
+
+---
+
 ## [0.1.0] — 2026-06-01
 
 First complete internal build: engine proven, keyboard working end-to-end, onboarding
