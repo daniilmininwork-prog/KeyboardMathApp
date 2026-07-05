@@ -19,9 +19,9 @@ permission, silent on non-math text (false positives are the one unforgivable si
 | --- | --- | --- |
 | **core-math engine** | this repo, `core-math/` | **Excellent.** BigDecimal `MathContext(34, HALF_EVEN)`, parse-first-then-veto detection, right-anchoring, locale-aware formatting. **224 JVM tests green** (golden/property/fuzz/stress/false-positive corpora). The crown jewel. |
 | Clean-room keyboard v2 | this repo, `keyboard-engine/`+`ime/`+`prediction/` (~24k LOC) | M0–M5 done ("Samsung-parity Phase 2"), but still a prototype-grade daily driver vs Gboard/Samsung. 42/45 tasks; TX.2/TX.3 remain. |
-| Overlay (rebuilt) | this repo, `overlay/` (+`overlay-app/`) | TO.1–TO.5 done, 77 tests green, correct-or-silent design; **stuck at TO.6 ship/cut human gate** (Samsung device matrix + Play policy). |
-| **Tally: Calculate** | this repo, `process-text/` (258 LOC) | **Done and shipped as APK** (Jun 4). Zero permissions, PROCESS_TEXT selection-toolbar calculator. Works with every keyboard. |
-| **TallyBoard fork** | `../TallyBoard` | HeliBoard v3.9-101 fork, engine vendored verbatim (diff-verified identical minus the KMP collapse), 50-line bridge + 3-point InputLogic integration, settings toggle, native-lib hardening. **Built and device-verified Jun 4** (`Tally-Keyboard-3.9.apk`). Sat **uncommitted for a month**; now preserved on branch `tally-integration` with the 95-entry false-positive corpus ported (all green). |
+| Overlay (rebuilt) | this repo, `overlay/` (+`overlay-app/`) | TO.1–TO.5 done, unit suite green (154 tests at this audit), correct-or-silent design; **stuck at TO.6 ship/cut human gate** (Samsung device matrix + Play policy). |
+| **Tally: Calculate** | this repo, `process-text/` (~360 LOC) | Zero permissions, PROCESS_TEXT selection-toolbar calculator; works alongside any keyboard. Post-audit: read-only results now render on a card (the June build's Toast was killed with the frozen process — computed answers were never shown from Chrome). |
+| **TallyBoard fork** | `../TallyBoard` | HeliBoard v3.9-101 fork, engine vendored verbatim (diff-verified identical minus the KMP collapse), 50-line bridge + 3-point InputLogic integration, settings toggle, native-lib hardening. **Built and device-verified Jun 4** (`Tally-Keyboard-3.9.apk`). Sat **uncommitted for a month**; now preserved on branch `tally-integration` with the 82-entry false-positive corpus ported (all green). |
 
 Timeline: clean-room build May 31–Jun 3 → honest root-cause docs (`rebuild/00–07`) → fork built
 in ONE DAY on Jun 4 and immediately reached the end-to-end experience the clean-room path had
@@ -40,7 +40,7 @@ not reached in five. That speed differential is the whole strategic argument.
    upstream sync away from loss. (Fixed this audit: branch `tally-integration`.)
 3. **The fork shipped without its immune system.** Only a 10-case port-integrity test came
    along; the golden/property/fuzz/false-positive corpora — the very thing that makes the
-   engine trustworthy — stayed behind in core-math. (Partially fixed this audit: the 95-entry
+   engine trustworthy — stayed behind in core-math. (Partially fixed this audit: the 82-entry
    false-positive corpus is ported and green. Golden/property/fuzz still to port.)
 4. **The clean-room keyboard is a strategic sinkhole.** Matching Gboard/Samsung/HeliBoard on
    gesture typing, multilingual dictionaries, layouts, OEM quirks, and accessibility is a
@@ -112,5 +112,6 @@ it just was never committed, licensed, or written down. Total debt to releasable
 carries ~150 integration lines on a maintained base with the engine's tests now arriving;
 that is *low* debt. The high-debt asset is the clean-room keyboard, and the correct treatment
 is mothballing, not repayment. The engine — the only truly hard thing built here — is done,
-proven (224 + 105 tests green across both repos), and now the strategy protects it instead of
-the keyboard rewrite consuming it.
+proven (224 core-math tests green, plus the fork's port-integrity tests and the 82-entry
+false-positive corpus), and now the strategy protects it instead of the keyboard rewrite
+consuming it.
