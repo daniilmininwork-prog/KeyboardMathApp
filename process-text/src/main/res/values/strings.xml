@@ -29,6 +29,6 @@
     <!-- Copy-to-clipboard action on the result card. -->
     <string name="copy_result">Copy</string>
 
-    <!-- Copy confirmation on pre-13 Android (13+ shows the system clipboard overlay instead). -->
+    <!-- In-place copy confirmation on pre-13 Android (13+ shows the system clipboard overlay instead). -->
     <string name="copied">Copied</string>
 </resources>

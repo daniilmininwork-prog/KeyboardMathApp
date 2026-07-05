@@ -15,7 +15,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import java.util.Locale
 
 /**
@@ -158,12 +157,17 @@ class ProcessTextActivity : Activity() {
                 setOnClickListener {
                     val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), result))
-                    // Android 13+ shows its own "copied" confirmation overlay; only speak up on
-                    // older versions, where a toast from the still-alive activity renders fine.
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(applicationContext, R.string.copied, Toast.LENGTH_SHORT).show()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        // 13+ shows the system clipboard confirmation overlay; leave right away.
+                        finish()
+                    } else {
+                        // Pre-13 there is no system confirmation, and a Toast would die with the
+                        // finishing activity (the very bug the card replaced) — confirm on the
+                        // button itself and linger just long enough to be read.
+                        isEnabled = false
+                        text = getString(R.string.copied)
+                        postDelayed({ finish() }, 900)
                     }
-                    finish()
                 }
             })
         }
