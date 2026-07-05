@@ -51,6 +51,11 @@ class DebugTypingActivity : Activity() {
             gravity = Gravity.TOP or Gravity.START
             contentDescription = CONTENT_DESC
             isFocusableInTouchMode = true
+            // TextView.canProcessText() refuses a view whose id is NO_ID (it routes the
+            // ACTION_PROCESS_TEXT result back by view id), so without an id the selection
+            // toolbar silently omits every process-text action — which this harness exists
+            // to exercise against Tally: Calculate.
+            id = android.view.View.generateViewId()
             layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
         }
 

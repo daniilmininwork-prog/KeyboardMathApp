@@ -8,6 +8,19 @@
     adb shell am start -n dev.tally/dev.tally.DebugTypingActivity
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Package-visibility declaration (Android 11+, debug only): without it the harness's own
+      EditText cannot see third-party ACTION_PROCESS_TEXT handlers, so the selection toolbar
+      silently omits them — which makes the harness useless for verifying Tally: Calculate
+      end-to-end (observed on API 35: only the system "Read aloud" survives the filter).
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+    </queries>
+
     <application>
         <activity
             android:name="dev.tally.DebugTypingActivity"
