@@ -10,19 +10,25 @@
     <string name="process_text_label">Tally: Calculate</string>
 
     <!--
-      Shown (via Toast) when the selection cannot be read or is empty. Friendly, non-technical.
+      Shown on the result card when the selection cannot be read or is empty. Friendly, non-technical.
     -->
     <string name="error_no_text">No text to calculate.</string>
 
     <!--
-      Shown (via Toast) when the selection is not a math expression Tally can evaluate.
+      Shown on the result card when the selection is not a math expression Tally can evaluate.
       The original selection is left untouched.
     -->
     <string name="error_not_expression">Not a math expression Tally can calculate.</string>
 
     <!--
-      Read-only result Toast (e.g. when the source field is not editable). %1$s is the result.
-      Accessibility: Toast text is announced by TalkBack, so the spoken result equals the shown one.
+      Read-only result line on the card (e.g. when the source field is not editable, or the host —
+      like Chrome — only invokes process-text read-only). %1$s is the formatted result.
     -->
     <string name="result_readonly">= %1$s</string>
+
+    <!-- Copy-to-clipboard action on the result card. -->
+    <string name="copy_result">Copy</string>
+
+    <!-- Copy confirmation on pre-13 Android (13+ shows the system clipboard overlay instead). -->
+    <string name="copied">Copied</string>
 </resources>
