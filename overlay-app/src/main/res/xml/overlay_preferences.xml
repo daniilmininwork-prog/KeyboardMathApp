@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the three TallyPreferences fields the overlay actually reads are exposed here:
+  overlay_enabled, precision, percent_mode. Keys MUST match TallyPreferences.KEY_* exactly so the
+  PreferenceFragment writes straight into the shared store the accessibility service reads.
+  IME-only fields (haptics, autocorrect, form_factor, etc.) are deliberately omitted —
+  the overlay ignores them.
+-->
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        app:key="overlay_enabled"
+        app:title="@string/overlay_app_pref_enabled_title"
+        app:summary="@string/overlay_app_pref_enabled_summary"
+        app:defaultValue="true"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="precision"
+        app:title="@string/overlay_app_pref_precision_title"
+        app:summary="%s"
+        app:entries="@array/overlay_app_precision_entries"
+        app:entryValues="@array/overlay_app_precision_values"
+        app:defaultValue="-1"
+        app:iconSpaceReserved="false" />
+
+    <ListPreference
+        app:key="percent_mode"
+        app:title="@string/overlay_app_pref_percent_mode_title"
+        app:summary="%s"
+        app:entries="@array/overlay_app_percent_mode_entries"
+        app:entryValues="@array/overlay_app_percent_mode_values"
+        app:defaultValue="ADDITIVE"
+        app:iconSpaceReserved="false" />
+
+    <!-- Convenience jump-off to the consent/accessibility flow from within settings. -->
+    <Preference
+        app:key="overlay_service"
+        app:title="@string/overlay_app_pref_service_title"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tally: Calculate — a PROCESS_TEXT one-shot calculator.
+
+  Zero permissions. The app declares NO <uses-permission> at all: it never touches the
+  network, storage, contacts, or any sensor. Its entire surface is a single Activity that
+  the OS launches from the text-selection toolbar, evaluates the selected expression
+  in-process, and finishes. This is the minimal-permission guarantee the repo enforces.
+
+  android:allowBackup="false": there is no user data to back up (the app stores nothing),
+  but we set it false explicitly so no SharedPreferences or future state can ever be sent
+  to Google cloud backup. Belt-and-suspenders, matching the repo privacy posture.
+
+  android:supportsRtl="true": result text and the "not a valid expression" message must
+  mirror correctly in RTL locales (Arabic, Hebrew).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="@string/app_name"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+
+        <!--
+          Single entry point. No launcher icon, no persistent UI.
+
+          android:exported="true" is required: the OS (a different process) starts this
+          activity when the user taps the toolbar item, so it must be externally launchable.
+          Exposure is safe — the only input it accepts is the selected text passed by the
+          framework, and it performs no privileged action.
+
+          android:theme is fully transparent and shows no title bar or window chrome, so the
+          calculate-and-replace path is invisible to the user. User-facing output (read-only
+          results, error messages) is delivered via Toast, which needs no activity window.
+
+          android:label on the intent-filter is what appears in the selection toolbar.
+        -->
+        <activity
+            android:name="dev.tally.mathtext.ProcessTextActivity"
+            android:exported="true"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:label="@string/app_name">
+            <intent-filter android:label="@string/process_text_label">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

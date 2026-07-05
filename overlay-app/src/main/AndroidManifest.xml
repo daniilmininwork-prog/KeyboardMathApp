@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The accessibility service (TallyOverlayService), its metadata, and the
+      OverlayConsentActivity are NOT declared here on purpose. They are contributed by the
+      :overlay library's own AndroidManifest.xml and merged in automatically, so re-declaring
+      them would either duplicate or shadow the library's definitions.
+
+      android:allowBackup="false" / dataExtractionRules / fullBackupContent: the overlay's
+      only persisted state is the shared TallyPreferences file. Cloud backup of preferences is
+      harmless but unnecessary; keeping backup off matches the :app module's privacy posture so
+      a restore can never carry settings between users or devices unexpectedly.
+
+      No permissions are declared: the overlay service is protected by
+      BIND_ACCESSIBILITY_SERVICE (declared inside :overlay) and the app itself needs none.
+    -->
+    <application
+        android:label="@string/overlay_app_name"
+        android:theme="@style/Theme.TallyOverlay"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:supportsRtl="true">
+
+        <activity
+            android:name="dev.tally.overlayapp.MainActivity"
+            android:exported="true"
+            android:label="@string/overlay_app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="dev.tally.overlayapp.OverlaySettingsActivity"
+            android:exported="false"
+            android:label="@string/overlay_app_settings"
+            android:parentActivityName="dev.tally.overlayapp.MainActivity" />
+
+    </application>
+
+</manifest>

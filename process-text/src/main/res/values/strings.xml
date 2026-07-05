@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Application label (shown in Settings > Apps). -->
+    <string name="app_name">Tally Calculate</string>
+
+    <!--
+      Label for the text-selection toolbar item. This is the exact text the user taps
+      after selecting an expression in any app. Kept short so it fits the floating toolbar.
+    -->
+    <string name="process_text_label">Tally: Calculate</string>
+
+    <!--
+      Shown (via Toast) when the selection cannot be read or is empty. Friendly, non-technical.
+    -->
+    <string name="error_no_text">No text to calculate.</string>
+
+    <!--
+      Shown (via Toast) when the selection is not a math expression Tally can evaluate.
+      The original selection is left untouched.
+    -->
+    <string name="error_not_expression">Not a math expression Tally can calculate.</string>
+
+    <!--
+      Read-only result Toast (e.g. when the source field is not editable). %1$s is the result.
+      Accessibility: Toast text is announced by TalkBack, so the spoken result equals the shown one.
+    -->
+    <string name="result_readonly">= %1$s</string>
+</resources>

@@ -1,28 +1,22 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.cyclonedx)
 }
 
 android {
-    namespace = "dev.tally"
+    namespace = "dev.tally.mathtext"
     compileSdk = 36
     defaultConfig {
-        applicationId = "dev.tally"
+        applicationId = "dev.tally.mathtext"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
     // Release signing reads from environment variables so the keystore never touches
-    // source control. Set these four vars in CI secrets or a local gradle.properties
-    // that is excluded from git (see .gitignore entry for "keystore.properties").
-    //
-    // TALLY_KEYSTORE_PATH      — absolute path to the .jks / .keystore file
-    // TALLY_KEYSTORE_PASS      — store password
-    // TALLY_KEY_ALIAS          — key alias within the store
-    // TALLY_KEY_PASS           — key password
+    // source control. Mirrors the :app module's approach (see app/build.gradle.kts):
+    //   TALLY_KEYSTORE_PATH / TALLY_KEYSTORE_PASS / TALLY_KEY_ALIAS / TALLY_KEY_PASS
     val keystorePath = System.getenv("TALLY_KEYSTORE_PATH")
     if (keystorePath != null) {
         signingConfigs {
@@ -51,24 +45,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions { jvmTarget = "11" }
-    testOptions {
-        unitTests.isIncludeAndroidResources = true
-    }
 }
 
 dependencies {
+    // The math engine only. Mirrors how :feature-glue wires :core-math.
+    // No appcompat / core-ktx: the single Activity extends android.app.Activity and uses a
+    // framework transparent theme, so there is nothing for AndroidX UI libraries to add.
     implementation(project(":core-math"))
-    implementation(project(":feature-glue"))
-    implementation(project(":design-system"))
-    implementation(project(":ime"))
-    implementation(project(":overlay"))
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.preference.ktx)
 
     testImplementation(libs.junit4)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.androidx.test.ext.junit)
 }

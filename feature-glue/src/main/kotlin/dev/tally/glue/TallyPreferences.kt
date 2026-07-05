@@ -14,6 +14,13 @@ class TallyPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLED, true)
         set(v) = prefs.edit().putBoolean(KEY_ENABLED, v).apply()
 
+    // Separate master switch for the accessibility overlay surface. Kept distinct from [enabled]
+    // (which gates the IME's suggestion strip) so the standalone overlay app can be turned off
+    // without silently disabling the keyboard's math suggestions on the same device, and vice versa.
+    var overlayEnabled: Boolean
+        get() = prefs.getBoolean(KEY_OVERLAY_ENABLED, true)
+        set(v) = prefs.edit().putBoolean(KEY_OVERLAY_ENABLED, v).apply()
+
     // Stored as a string so that ListPreference (which always writes strings) stays in sync.
     var precision: Int
         get() = prefs.getString(KEY_PRECISION, DEFAULT_PRECISION.toString())?.toIntOrNull() ?: DEFAULT_PRECISION
@@ -259,6 +266,7 @@ class TallyPreferences(context: Context) {
         private const val TAG = "TallyPreferences"
 
         const val KEY_ENABLED            = "enabled"
+        const val KEY_OVERLAY_ENABLED    = "overlay_enabled"
         const val KEY_PRECISION          = "precision"
         const val KEY_PERCENT_MODE       = "percent_mode"
         const val KEY_REPLACE_EXPRESSION = "replace_expression"

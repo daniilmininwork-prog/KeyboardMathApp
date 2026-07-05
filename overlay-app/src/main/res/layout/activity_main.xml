@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_app_name"
+            android:textAppearance="?attr/textAppearanceDisplaySmall"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_app_tagline"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginBottom="32dp" />
+
+        <!--
+          Status block. The title + sub-text are populated at runtime from the live
+          accessibility-service state. focusable + a polite live region so TalkBack announces
+          the status change when the user returns from system settings.
+        -->
+        <TextView
+            android:id="@+id/overlay_status_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:gravity="center"
+            android:focusable="true"
+            android:accessibilityLiveRegion="polite"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/overlay_status_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:gravity="center"
+            android:layout_marginBottom="36dp" />
+
+        <!--
+          Primary call to action. The label swaps between "Enable overlay" (service off) and
+          "Manage accessibility service" (service on) so it is never a dead end — it always
+          routes to OverlayConsentActivity, which deep-links to system Accessibility settings.
+        -->
+        <Button
+            android:id="@+id/btn_enable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_app_btn_enable"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btn_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_app_btn_settings"
+            style="?attr/materialButtonOutlinedStyle" />
+
+    </LinearLayout>
+
+</ScrollView>

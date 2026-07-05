@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      App-facing strings for the decoupled Tally Overlay app.
+
+      Strings prefixed overlay_app_ are owned here. Strings without that prefix
+      (overlay_status_enabled, overlay_status_disabled, overlay_consent_*, the precision/
+      percent preference arrays' counterparts, etc.) come from the merged :overlay library and
+      are intentionally NOT redefined to avoid shadowing the library's copy.
+    -->
+    <string name="overlay_app_name">Tally Overlay</string>
+    <string name="overlay_app_settings">Overlay settings</string>
+
+    <!-- Home screen -->
+    <string name="overlay_app_tagline">Math results above any keyboard</string>
+    <string name="overlay_app_status_on_title">Overlay is on</string>
+    <string name="overlay_app_status_off_title">Overlay is off</string>
+    <string name="overlay_app_status_on_sub">The accessibility service is enabled. Type an arithmetic expression in any app and the result chip appears once the text is committed.</string>
+    <string name="overlay_app_status_off_sub">Enable the \"Tally Math Overlay\" accessibility service to show math results above your keyboard. Tally reads only the field you are actively typing in and never logs, stores, or transmits your text.</string>
+
+    <!-- Buttons -->
+    <string name="overlay_app_btn_enable">Enable overlay</string>
+    <string name="overlay_app_btn_manage">Manage accessibility service</string>
+    <string name="overlay_app_btn_settings">Overlay settings</string>
+
+    <!-- Accessibility content descriptions (TalkBack) -->
+    <string name="overlay_app_status_icon_on_desc">Overlay enabled</string>
+    <string name="overlay_app_status_icon_off_desc">Overlay disabled</string>
+
+    <!-- Settings screen preference titles/summaries (overlay-relevant fields only) -->
+    <string name="overlay_app_pref_enabled_title">Show math results</string>
+    <string name="overlay_app_pref_enabled_summary">When off, the overlay stays installed but never evaluates expressions or shows the result chip.</string>
+    <string name="overlay_app_pref_precision_title">Decimal precision</string>
+    <string name="overlay_app_pref_percent_mode_title">Percent behaviour</string>
+    <string name="overlay_app_pref_service_title">Accessibility service</string>
+
+    <!-- ListPreference entries: kept local so the app does not depend on :app's array names. -->
+    <string-array name="overlay_app_precision_entries">
+        <item>Automatic</item>
+        <item>0 decimal places</item>
+        <item>1 decimal place</item>
+        <item>2 decimal places</item>
+        <item>3 decimal places</item>
+        <item>4 decimal places</item>
+    </string-array>
+    <string-array name="overlay_app_precision_values">
+        <item>-1</item>
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+
+    <string-array name="overlay_app_percent_mode_entries">
+        <item>Additive (100+20% = 120)</item>
+        <item>Direct (100+20% = 100.2)</item>
+    </string-array>
+    <string-array name="overlay_app_percent_mode_values">
+        <item>ADDITIVE</item>
+        <item>DIRECT</item>
+    </string-array>
+</resources>

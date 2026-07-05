@@ -2,7 +2,9 @@ package dev.tally.overlay
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -72,6 +74,8 @@ class TallyOverlayService : AccessibilityService() {
 
         val window = OverlayChipWindow(this).also { w ->
             w.onInsert = { insertCurrentSuggestion() }
+            // Apple-like: the result is only a suggestion — tapping anywhere else dismisses it.
+            w.onOutsideTap = { clearSuggestion() }
         }
         chipWindow = window
 
@@ -86,9 +90,9 @@ class TallyOverlayService : AccessibilityService() {
             }
             currentSuggestion = suggestion
             if (suggestion != null) {
-                val bounds = getFocusedFieldBounds()
-                if (bounds != null) {
-                    window.show(suggestion.display, bounds)
+                val anchor = getCursorAnchor()
+                if (anchor != null) {
+                    window.show(suggestion.display, anchor)
                 } else {
                     window.dismiss()
                     currentSuggestion = null
@@ -176,7 +180,7 @@ class TallyOverlayService : AccessibilityService() {
         focusToken = token
 
         val p = prefs ?: return
-        if (!p.enabled) {
+        if (!p.overlayEnabled) {
             clearSuggestion()
             return
         }
@@ -209,6 +213,18 @@ class TallyOverlayService : AccessibilityService() {
         // node.refresh() was already called above for the secure-field gate, so the snapshot is
         // current here — no second refresh needed before reading the text.
         val text = node.text?.toString() ?: ""
+
+        // While the user has an active (non-empty) text selection — e.g. selecting the expression
+        // before the '=' — get out of the way entirely so the chip never competes with the
+        // selection handles or the floating selection toolbar. The chip returns on the next
+        // text/caret change once the selection collapses.
+        val selStart = node.textSelectionStart
+        val selEnd = node.textSelectionEnd
+        if (selStart >= 0 && selEnd >= 0 && selStart != selEnd) {
+            clearSuggestion()
+            return
+        }
+
         val rawCursor = node.textSelectionEnd
         // -1 means selection end not reported (common on Samsung / some OEM fields).
         // Append-at-end is the safe fallback so expression search still runs.
@@ -243,18 +259,58 @@ class TallyOverlayService : AccessibilityService() {
         return OverlayDormancy.isTallyImeActive(active)
     }
 
-    private fun getFocusedFieldBounds(): Rect? {
+    /**
+     * Returns the on-screen rectangle of the caret's text line so the chip can be placed *exactly*
+     * where the expression is (Apple-like), not floating over the whole field.
+     *
+     * Primary path: [AccessibilityNodeInfo.refreshWithExtraData] with
+     * [AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY] gives the per-character screen
+     * rects; we take the character just before the caret. `left == right == caretX` and `top/bottom`
+     * bound that line, which is what [OverlayChipWindow] expects.
+     *
+     * Fallback: when the editor doesn't report character locations (some OEM/custom fields), or the
+     * field is empty, degrade to the whole field bounds — never worse than the previous behaviour.
+     */
+    private fun getCursorAnchor(): Rect? {
         val node = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
         return try {
-            val rect = Rect()
-            node.getBoundsInScreen(rect)
-            if (rect.isEmpty) null else rect
+            caretLineRect(node) ?: fieldBoundsRect(node)
         } catch (e: RuntimeException) {
-            Log.e(TAG, "getBoundsInScreen threw unexpectedly; treating as no bounds", e)
+            Log.e(TAG, "getCursorAnchor threw unexpectedly; treating as no anchor", e)
             null
         } finally {
             recycleNode(node)
         }
+    }
+
+    private fun caretLineRect(node: AccessibilityNodeInfo): Rect? {
+        val text = node.text?.toString() ?: return null
+        if (text.isEmpty()) return null
+        val caret = node.textSelectionEnd.let { if (it < 0) text.length else it }
+        // The character immediately left of the caret is the one the user just typed (e.g. '=').
+        val charIndex = (caret - 1).coerceIn(0, text.length - 1)
+
+        val args = Bundle().apply {
+            putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX, charIndex)
+            putInt(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH, 1)
+        }
+        if (!node.refreshWithExtraData(AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY, args)) {
+            return null
+        }
+        val rects = node.extras.getParcelableArray(
+            AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY,
+        )
+        val charRect = rects?.firstOrNull() as? RectF ?: return null
+        if (charRect.isEmpty) return null
+        // Anchor x at the caret (right edge of the last char); top/bottom span its line.
+        val caretX = charRect.right.toInt()
+        return Rect(caretX, charRect.top.toInt(), caretX, charRect.bottom.toInt())
+    }
+
+    private fun fieldBoundsRect(node: AccessibilityNodeInfo): Rect? {
+        val rect = Rect()
+        node.getBoundsInScreen(rect)
+        return if (rect.isEmpty) null else rect
     }
 
     private fun insertCurrentSuggestion() {

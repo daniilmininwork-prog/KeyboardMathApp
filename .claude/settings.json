@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(adb:*)",
+      "Bash(adb shell input:*)",
+      "Bash(adb shell ime:*)",
+      "Bash(adb shell settings:*)",
+      "Bash(adb exec-out screencap:*)",
+      "Bash(adb exec-out uiautomator:*)",
+      "Bash(adb shell uiautomator:*)",
+      "Bash(adb shell am:*)",
+      "Bash(adb shell pm list:*)",
+      "Bash(adb devices:*)"
+    ]
+  }
+}

@@ -31,6 +31,9 @@ internal class OverlayChipWindow(private val context: Context) {
     /** Called when the user taps the chip to insert the result. */
     var onInsert: (() -> Unit)? = null
 
+    /** Called when the user taps anywhere outside the chip — treated as "dismiss / ignore". */
+    var onOutsideTap: (() -> Unit)? = null
+
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private val chip = MathResultChip(context).also { chip ->
         chip.filterTouchesWhenObscured = true
@@ -44,6 +47,17 @@ internal class OverlayChipWindow(private val context: Context) {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
+        // With FLAG_WATCH_OUTSIDE_TOUCH the window receives ACTION_OUTSIDE for taps beyond its
+        // bounds. Treat that as "dismiss" so the suggestion is trivially easy to cancel (Apple-like:
+        // tap anywhere else and it goes away) without ever stealing focus from the field.
+        frame.setOnTouchListener { _, e ->
+            if (e.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                onOutsideTap?.invoke()
+                true
+            } else {
+                false
+            }
+        }
     }
     private var isAttached = false
 
@@ -54,27 +68,40 @@ internal class OverlayChipWindow(private val context: Context) {
      *
      * Safe to call when the chip is already visible — updates text and repositions.
      */
-    fun show(text: String, fieldBounds: Rect) {
+    fun show(text: String, anchor: Rect) {
         val chipH = dpToPx(CHIP_HEIGHT_DP).toInt()
         val margin = dpToPx(CHIP_MARGIN_DP).toInt()
         val band = resolveContentBand()
+        // [anchor] is the cursor line: top/bottom bound the current text line, and centerX is the
+        // caret x. The chip sits just above (or below) that line, horizontally centred on the caret,
+        // so the result appears right where the expression is — not floating over the whole field.
         val placement = OverlayPlacement.compute(
-            fieldTop = fieldBounds.top,
-            fieldBottom = fieldBounds.bottom,
+            fieldTop = anchor.top,
+            fieldBottom = anchor.bottom,
             contentTop = band.top,
             contentBottom = band.bottom,
             chipHeight = chipH,
             margin = margin,
         )
         if (placement is OverlayPlacement.Placement.Suppress) {
-            // Keyboard would occlude the chip, or there is no room outside the system bars.
+            // No room outside the system bars / keyboard for a fully-visible, tappable chip.
             dismiss()
             return
         }
         val y = (placement as OverlayPlacement.Placement.Show).y
 
-        val params = buildWindowParams(y)
         chip.show(text)
+        // Measure the (wrap-content) chip so it can be centred on the caret and clamped on-screen.
+        val screenW = resolveScreenWidth()
+        container.measure(
+            android.view.View.MeasureSpec.makeMeasureSpec(screenW, android.view.View.MeasureSpec.AT_MOST),
+            android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+        )
+        val chipW = container.measuredWidth.coerceAtLeast(dpToPx(MIN_CHIP_WIDTH_DP).toInt())
+        val maxX = (screenW - chipW - margin).coerceAtLeast(margin)
+        val x = (anchor.centerX() - chipW / 2).coerceIn(margin, maxX)
+
+        val params = buildWindowParams(x, y)
         if (isAttached) {
             try {
                 windowManager.updateViewLayout(container, params)
@@ -143,18 +170,32 @@ internal class OverlayChipWindow(private val context: Context) {
     /** Dismisses and releases resources. Call from [TallyOverlayService.onDestroy]. */
     fun destroy() = dismiss()
 
-    private fun buildWindowParams(y: Int): WindowManager.LayoutParams =
+    private fun buildWindowParams(x: Int, y: Int): WindowManager.LayoutParams =
         WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            // NOT_FOCUSABLE: never steal focus from the field. NOT_TOUCH_MODAL: let touches outside
+            // the chip reach the app underneath (so the user can keep typing / selecting).
+            // WATCH_OUTSIDE_TOUCH: still be told about those outside taps so we can dismiss.
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            // TOP|START + explicit x so the chip is positioned at the caret, not screen-centred.
+            gravity = Gravity.TOP or Gravity.START
+            this.x = x
             this.y = y
+        }
+
+    /** Display width in px, inset-agnostic (used to clamp the chip horizontally on-screen). */
+    private fun resolveScreenWidth(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            windowManager.currentWindowMetrics.bounds.width()
+        } else {
+            context.resources.displayMetrics.widthPixels
         }
 
     /**
@@ -195,6 +236,9 @@ internal class OverlayChipWindow(private val context: Context) {
     private companion object {
         const val CHIP_HEIGHT_DP = 44f
         const val CHIP_MARGIN_DP = 8f
+        // Floor for the measured chip width when centring on the caret, so a 1-char result like "4"
+        // still gets a sensible clamp box.
+        const val MIN_CHIP_WIDTH_DP = 48f
         const val TAG = "OverlayChipWindow"
     }
 }

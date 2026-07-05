@@ -1,28 +1,23 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.cyclonedx)
 }
 
 android {
-    namespace = "dev.tally"
+    namespace = "dev.tally.overlayapp"
     compileSdk = 36
     defaultConfig {
-        applicationId = "dev.tally"
+        applicationId = "dev.tally.overlay"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 1
+        versionName = "0.1.0"
     }
 
     // Release signing reads from environment variables so the keystore never touches
-    // source control. Set these four vars in CI secrets or a local gradle.properties
-    // that is excluded from git (see .gitignore entry for "keystore.properties").
-    //
-    // TALLY_KEYSTORE_PATH      — absolute path to the .jks / .keystore file
-    // TALLY_KEYSTORE_PASS      — store password
-    // TALLY_KEY_ALIAS          — key alias within the store
-    // TALLY_KEY_PASS           — key password
+    // source control — identical policy to the :app module. The four TALLY_* vars are
+    // documented there; this module reuses them so a single signing identity covers both
+    // installable apps.
     val keystorePath = System.getenv("TALLY_KEYSTORE_PATH")
     if (keystorePath != null) {
         signingConfigs {
@@ -57,11 +52,16 @@ android {
 }
 
 dependencies {
-    implementation(project(":core-math"))
+    // The decoupled overlay app deliberately does NOT depend on :ime — it ships only the
+    // accessibility-driven overlay. :overlay provides OverlayConsentActivity, TallyOverlayService
+    // and OverlayPermissionState (and merges their manifest entries). :feature-glue provides
+    // TallyPreferences; :core-math provides PercentMode used by the settings screen. :design-system
+    // is :overlay's transitive UI dependency, pulled in for manifest/resource merging.
+    implementation(project(":overlay"))
     implementation(project(":feature-glue"))
     implementation(project(":design-system"))
-    implementation(project(":ime"))
-    implementation(project(":overlay"))
+    implementation(project(":core-math"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
